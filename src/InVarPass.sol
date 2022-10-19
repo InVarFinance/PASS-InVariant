@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.13;
 
 import "ERC721A/extensions/ERC721AQueryable.sol";
@@ -7,11 +7,13 @@ import "openzeppelin-contracts/utils/cryptography/MerkleProof.sol";
 import "openzeppelin-contracts/access/Ownable.sol";
 import "./IPass.sol";
 
-contract InVarPass is ERC721AQueryable, IPASS, Ownable {
+contract InVarPass is ERC721AQueryable, IPass, Ownable {
 
     SaleConfig public saleConfig;
 
     address constant RE_NFT = 0xCeF98e10D1e80378A9A74Ce074132B66CDD5e88d;
+    // mainnet
+    // address constant RE_NFT = 0x502818ec5767570F7fdEe5a568443dc792c4496b;
 
     // total supply
     uint256 private _supply;
@@ -57,6 +59,10 @@ contract InVarPass is ERC721AQueryable, IPASS, Ownable {
         _supply = supply;
     }
 
+    function setSkyMintStart(bool _start) external onlyOwner {
+        _skyMintStart = _start;
+    }
+
     // backend fetches the type to return the right metadata of the token id
     function getTypeByToken(uint256 _tokenId) external view returns (uint256) {
         if (!_exists(_tokenId)) revert TypeQueryForNonexistentToken();
@@ -72,13 +78,13 @@ contract InVarPass is ERC721AQueryable, IPASS, Ownable {
     }
 
     function whitelistMint(bytes32[] calldata merkleProof) external payable {
+        if (_merkleRoot == 0) revert SaleTimeNotReach();
         // merkle proof
         bytes32 leaf = keccak256(abi.encodePacked(msg.sender));
         if (whitelistCalimed[msg.sender]) revert AlreadyClaimed();
         if (!MerkleProof.verify(merkleProof, _merkleRoot, leaf)) revert InvalidProof();
         whitelistCalimed[msg.sender] = true;
         // whitelist mint
-        if (_merkleRoot == 0) revert SaleTimeNotReach();
         if (msg.value < saleConfig.whitelistPrice) revert InsufficientEthers();
         if (ERC721A.totalSupply() + 1 > _supply) revert MintExceedsLimit();
         _mint(msg.sender, 1);
@@ -123,11 +129,11 @@ contract InVarPass is ERC721AQueryable, IPASS, Ownable {
     function _lastTokenOfOwner(address owner) internal view returns (uint256) {
         uint256 tokenIdsIdx;
         address currOwnershipAddr;
-        uint256 tokenIdsLength = balanceOf(owner);
+        uint256 tokenIdsLength = ERC721A.balanceOf(owner);
         uint256 tokenId = 0;
         TokenOwnership memory ownership;
-        for (uint256 i = _startTokenId(); tokenIdsIdx != tokenIdsLength; ++i) {
-            ownership = _ownershipAt(i);
+        for (uint256 i = ERC721A._startTokenId(); tokenIdsIdx != tokenIdsLength; ++i) {
+            ownership = ERC721A._ownershipAt(i);
             if (ownership.burned) {
                 continue;
             }
