@@ -9,6 +9,7 @@ interface IPass {
     error SaleTimeNotReach();
     error TypeError();
     error NotOwner();
+    error NullAddress();
     error TypeQueryForNonexistentToken();
     error InvalidProof();
     error MintNotStart();
@@ -27,6 +28,4 @@ interface IPass {
         uint64 publicPrice;
         uint8 publicMintQuantity;
     }
-
-    function getTypeByToken(uint256 _tokenId) external view returns (uint256);
 }

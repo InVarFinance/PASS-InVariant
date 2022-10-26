@@ -18,6 +18,9 @@ contract InVarPass is ERC721AQueryable, IPass, Ownable {
     // total supply
     uint256 private _supply;
 
+    // for sky mint use
+    address private _signatureAddress = address(0);
+
     // merkle tree
     bytes32 public _merkleRoot;
     mapping(address => bool) public whitelistCalimed;
@@ -33,6 +36,11 @@ contract InVarPass is ERC721AQueryable, IPass, Ownable {
     {
         _baseTokenURI = baseURI;
         _supply = supply;
+    }
+
+    function setSignatureAddress(address signatureAddress) external onlyOwner {
+        if (signatureAddress == address(0)) revert NullAddress();
+        _signatureAddress = signatureAddress;
     }
 
     function setSaleConfig(
@@ -63,15 +71,10 @@ contract InVarPass is ERC721AQueryable, IPass, Ownable {
         _skyMintStart = _start;
     }
 
-    // backend fetches the type to return the right metadata of the token id
-    function getTypeByToken(uint256 _tokenId) external view returns (uint256) {
-        if (!_exists(_tokenId)) revert TypeQueryForNonexistentToken();
-        return uint256(_tokenTypes[_tokenId]);
-    }
-
     function freeMint(uint256 _quantity) external {
         uint256 _saleStartTime = uint256(saleConfig.freemintSaleStartTime);
         if (block.timestamp < _saleStartTime || _saleStartTime == 0) revert SaleTimeNotReach();
+        // todo: only 1st staged user(private sale, white list sale, public sale)
         if (IERC1155(RE_NFT).balanceOf(msg.sender, 1) < 0) revert OnlyReOwner();
         if (ERC721A.totalSupply() + _quantity > _supply) revert MintExceedsLimit();
         _mint(msg.sender, _quantity);
@@ -100,51 +103,9 @@ contract InVarPass is ERC721AQueryable, IPass, Ownable {
     }
 
     function skyMint(uint256 earthToken, uint256 oceanToken) external {
-        if (!_skyMintStart) revert MintNotStart();
-        
-        if (
-            !ERC721A._exists(earthToken) || 
-            !ERC721A._exists(oceanToken)
-        ) revert MintSkyQueryForNonexistentToken();
-
-        if (
-            _tokenTypes[earthToken] != Type.Earth ||
-            _tokenTypes[oceanToken] != Type.Ocean
-        ) revert TypeError();
-
-        if (
-            ERC721A.ownerOf(earthToken) != msg.sender ||
-            ERC721A.ownerOf(oceanToken) != msg.sender
-        ) revert NotOwner();
-
-        delete _tokenTypes[earthToken];
-        delete _tokenTypes[oceanToken];
-        _burn(earthToken);
-        _burn(oceanToken);
+        // todo: verify signature before mint
 
         _mint(msg.sender, 1);
-        _tokenTypes[_lastTokenOfOwner(msg.sender)] = Type.Sky;
-    }
-
-    function _lastTokenOfOwner(address owner) internal view returns (uint256) {
-        uint256 tokenIdsIdx;
-        address currOwnershipAddr;
-        uint256 tokenIdsLength = ERC721A.balanceOf(owner);
-        uint256 tokenId = 0;
-        TokenOwnership memory ownership;
-        for (uint256 i = ERC721A._startTokenId(); tokenIdsIdx != tokenIdsLength; ++i) {
-            ownership = ERC721A._ownershipAt(i);
-            if (ownership.burned) {
-                continue;
-            }
-            if (ownership.addr != address(0)) {
-                currOwnershipAddr = ownership.addr;
-            }
-            if (currOwnershipAddr == owner) {
-                tokenId = i;
-            }
-        }
-        return tokenId;
     }
 
     // override

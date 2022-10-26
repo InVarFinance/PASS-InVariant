@@ -276,4 +276,10 @@ contract InVarPassTest is Test {
         leaves[99] = keccak256(abi.encodePacked(makeAddr("alice")));
         return leaves;
     }
+
+    function testRandom() public {
+        skip(1);
+        IPass.Type nftType = ipass.random();
+        emit log_uint(uint256(nftType));
+    }
 }
