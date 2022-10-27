@@ -82,7 +82,7 @@ contract InVarPassTest is Test {
         vm.stopPrank();
     }
 
-    function test_RevertFreeMintWithOnlyReOwner() public {
+    function test_RevertFreeMintWithOnlyFirstStagedParticipant() public {
         vm.startPrank(owner);
         ipass.setSaleConfig(
             uint32(block.timestamp),
@@ -92,7 +92,7 @@ contract InVarPassTest is Test {
             uint8(3)
         );
         changePrank(alice);
-        vm.expectRevert(IPass.OnlyReOwner.selector);
+        vm.expectRevert(IPass.OnlyFirstStagedParticipant.selector);
         ipass.freeMint(1);
         vm.stopPrank();
     }
@@ -254,6 +254,36 @@ contract InVarPassTest is Test {
         assertEq(ipass.balanceOf(alice), 3);
     }
 
+    function testPremiumMint() public {
+        vm.startPrank(owner);
+        // mock signed msg
+        uint256 privateKey = 0xA11CE;
+        address signature = vm.addr(privateKey);
+        ipass.setSignatureAddress(signature);
+        ipass.setIsPremiumStart(true);
+        bytes32 hashMsg = keccak256(
+            abi.encode(
+                0x5948703d1E8282f23e35a3961DDa2d885e4c2443, 
+                "Sky", 
+                1
+            ));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, hashMsg);
+        
+        ipass.setSaleConfig(
+            uint32(block.timestamp),
+            uint32(block.timestamp),
+            uint64(0.05 ether),
+            uint64(0.08 ether),
+            uint8(3)
+        );
+        deal(alice, 1 ether);
+        changePrank(alice);
+        ipass.publicMint{value: 0.16 ether}(2);
+        ipass.premiumMint(hashMsg, v, r, s, 1, 2);
+        assertEq(ipass.balanceOf(alice), 1);
+        vm.stopPrank();
+    }
+
     function _getData() internal view returns (bytes32[] memory) {
         bytes32[] memory _data = new bytes32[](data.length);
         uint length = data.length;
@@ -277,9 +307,4 @@ contract InVarPassTest is Test {
         return leaves;
     }
 
-    function testRandom() public {
-        skip(1);
-        IPass.Type nftType = ipass.random();
-        emit log_uint(uint256(nftType));
-    }
 }
