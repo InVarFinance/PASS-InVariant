@@ -4,18 +4,25 @@ pragma solidity ^0.8.13;
 import "forge-std/Test.sol";
 import { InVarPass } from "../src/InVarPass.sol";
 import { IPass } from "../src/IPass.sol";
-import { MockERC1155 } from "./utils/MockERC1155.sol";
 import { Merkle } from "murky/Merkle.sol";
 import "openzeppelin-contracts/utils/Strings.sol";
+import "openzeppelin-contracts/utils/cryptography/MerkleProof.sol";
 
 contract InVarPassTest is Test {
-    using stdStorage for StdStorage;
     using Strings for uint256;
 
+    bytes32 constant FREE_MINT = 0xaca2929d09e74b1bd257acca0d40349ade3291350b31ee1e04b706c764e53859;
+    bytes32 constant WHITELIST = 0xc3d232a6c0e2fb343117f17a5ff344a1a84769265318c6d7a8d7d9b2f8bb49e3;
+    bytes32 constant TOKEN = 0x1317f51c845ce3bfb7c268e5337a825f12f3d0af9584c2bbfbf4e64e314eaf73;
+
     InVarPass internal ipass;
-    MockERC1155 internal erc1155;
     Merkle internal merkle;
     bytes32[100] data;
+
+    bytes32[] mockProof;
+    bool[] mockProofFlags;
+    bytes32[] mockLeaves;
+    bytes32 mockRoot;
 
     address owner = makeAddr("owner");
     address alice = makeAddr("alice");
@@ -30,86 +37,141 @@ contract InVarPassTest is Test {
 
         vm.startPrank(owner);
         ipass = new InVarPass("InVarPass", "IVP", "", 500);
-        erc1155 = new MockERC1155();
         merkle = new Merkle();
         vm.stopPrank();
+
+        mockProof = new bytes32[](17);
+        mockProof[0] = 0x9538189ca6eb762597642aec4fde397f64651eb70e9b63bc89d0030da22f7582;
+        mockProof[1] = 0x9f48ad18135aa4c5cfeff3416bb25537d3e05b5d72b8f8329e12d866cd124f7b;
+        mockProof[2] = 0x7c0a3b107a3dddf93244216d85ec7e5aee12f01a83ae0e294a3bb637ff243f6b;
+        mockProof[3] = 0xa10bfbb842daf3344324e261b380b686db43b1346070a6d4bbea36a0e6a9731e;
+        mockProof[4] = 0x74d7123f11ae377247ced4df42fba1502ffccb4080aaf30ceebd4580f130d821;
+        mockProof[5] = 0x74d7123f11ae377247ced4df42fba1502ffccb4080aaf30ceebd4580f130d821;
+        mockProof[6] = 0x97f447fda38791bf20397193931a01c4e5b544bb923cd9e3aa488fbda5244458;
+        mockProof[7] = 0x7e54a703c7a4de2603ed47e075dde91eb49286f10efb2486b1a5fe3d5fe7a67c;
+        mockProof[8] = 0x8252890dc2bf4ab3bd77cf27c8bae66d140d1c02b62085e8446e42d99420d83e;
+        mockProof[9] = 0x8252890dc2bf4ab3bd77cf27c8bae66d140d1c02b62085e8446e42d99420d83e;
+        mockProof[10] = 0x3eb2d7b68338f49ce776897758e01de813d37bedfd9bfe485a0eb5e179555f21;
+        mockProof[11] = 0x3eb2d7b68338f49ce776897758e01de813d37bedfd9bfe485a0eb5e179555f21;
+        mockProof[12] = 0x28ed21c2e726ca6ca8f10a80b5441c1952b7820d3a33f24859e0c3a8d3db7ede;
+        mockProof[13] = 0xc8c92a7fc7c66783872b616b458d49980e4f61a74680901703249fd36ef9581a;
+        mockProof[14] = 0xf693a8862b55572a1a81f7e9c40ea09e95988eca33fd90cfecf96d3ee79da812;
+        mockProof[15] = 0x7a99ccb0697fa5e7586def751fee632014dd2a603449842f3d5802fc44aee6f7;
+        mockProof[16] = 0x3269a4fc321cb06d4b2ba6bb28bcbcf88e604f6159c5d5771a4501a16200c9f3;
+        
+        mockProofFlags = new bool[](18);
+        mockProofFlags[0] = false;
+        mockProofFlags[1] = false;
+        mockProofFlags[2] = false;
+        mockProofFlags[3] = false;
+        mockProofFlags[4] = false;
+        mockProofFlags[5] = false;
+        mockProofFlags[6] = false;
+        mockProofFlags[7] = false;
+        mockProofFlags[8] = false;
+        mockProofFlags[9] = false;
+        mockProofFlags[10] = false;
+        mockProofFlags[11] = false;
+        mockProofFlags[12] = false;
+        mockProofFlags[13] = false;
+        mockProofFlags[14] = false;
+        mockProofFlags[15] = false;
+        mockProofFlags[16] = true;
+        mockProofFlags[17] = false;
+        
+        mockLeaves = new bytes32[](2);
+        mockLeaves[0] = 0x9538189ca6eb762597642aec4fde397f64651eb70e9b63bc89d0030da22f7582;
+        mockLeaves[1] = 0x9f48ad18135aa4c5cfeff3416bb25537d3e05b5d72b8f8329e12d866cd124f7b;
+        
+        mockRoot = 0x25858ea94774555f1347ca19f24f65f9abeeb2352cf87b597055a958b773a188;
     }
 
     function testSetSaleConfig() public {
         vm.prank(owner);
-        ipass.setSaleConfig(
-            uint32(block.timestamp),
-            uint32(block.timestamp),
-            uint64(0.05 ether),
-            uint64(0.08 ether),
-            uint8(3)
-        );
+        ipass.setSaleConfig(true, false, false);
         (
-            uint32 freemintSaleStartTime,
-            uint32 publicSaleStartTime,
-            uint64 whitelistPrice,
-            uint64 publicPrice,
-            uint8 publicMintQuantity
+            bool isFreeMint,
+            bool isWhitelistMint,
+            bool isPublicMint
         ) = ipass.saleConfig();
 
-        assertEq(freemintSaleStartTime, block.timestamp);
-        assertEq(publicSaleStartTime, block.timestamp);
-        assertEq(whitelistPrice, 0.05 ether);
-        assertEq(publicPrice, 0.08 ether);
-        assertEq(publicMintQuantity, 3);
+        assertTrue(isFreeMint);
+        assertFalse(isWhitelistMint);
+        assertFalse(isPublicMint);
     }
 
     function testFreeMint() public {
+        bytes32[] memory _data = _getData();
+        bytes32 root = merkle.getRoot(_data);
+        bytes32[] memory proof = merkle.getProof(_data, 99);
+
         vm.startPrank(owner);
-        ipass.setSaleConfig(
-            uint32(block.timestamp),
-            uint32(block.timestamp),
-            uint64(0.05 ether),
-            uint64(0.08 ether),
-            uint8(3)
-        );
+        ipass.setSaleConfig(true, false, false);
+        ipass.setMerkleRoot(root, FREE_MINT);
         changePrank(alice);
-        erc1155.mint(1, 1);
-        ipass.freeMint(1);
+        ipass.freeMint(proof);
         vm.stopPrank();
         assertEq(ipass.balanceOf(alice), 1);
     }
 
     function test_RevertFreeMintWithSaleTimeNotReach() public {
+        bytes32[] memory _data = _getData();
+        bytes32 root = merkle.getRoot(_data);
+        bytes32[] memory proof = merkle.getProof(_data, 99);
+
         vm.startPrank(alice);
         vm.expectRevert(IPass.SaleTimeNotReach.selector);
-        ipass.freeMint(1);
+        ipass.freeMint(proof);
+
+        changePrank(owner);
+        ipass.setMerkleRoot(root, FREE_MINT);
+        changePrank(alice);
+        vm.expectRevert(IPass.SaleTimeNotReach.selector);
+        ipass.freeMint(proof);
         vm.stopPrank();
     }
 
-    function test_RevertFreeMintWithOnlyFirstStagedParticipant() public {
+    function test_RevertFreeMintWithAlreadyClaimed() public {
+        bytes32[] memory _data = _getData();
+        bytes32 root = merkle.getRoot(_data);
+        bytes32[] memory proof = merkle.getProof(_data, 99);
+
         vm.startPrank(owner);
-        ipass.setSaleConfig(
-            uint32(block.timestamp),
-            uint32(block.timestamp),
-            uint64(0.05 ether),
-            uint64(0.08 ether),
-            uint8(3)
-        );
+        ipass.setSaleConfig(true, false, false);
+        ipass.setMerkleRoot(root, FREE_MINT);
+        deal(alice, 1 ether);
         changePrank(alice);
-        vm.expectRevert(IPass.OnlyFirstStagedParticipant.selector);
-        ipass.freeMint(1);
+        ipass.freeMint(proof);
+        vm.expectRevert(IPass.AlreadyClaimed.selector);
+        ipass.freeMint(proof);
+        vm.stopPrank();
+    }
+
+    function test_RevertFreeMintWithInvalidProof() public {
+        bytes32[] memory _data = _getData();
+        bytes32 root = merkle.getRoot(_data);
+        bytes32[] memory proof = merkle.getProof(_data, 99);
+
+        vm.startPrank(owner);
+        ipass.setSaleConfig(true, false, false);
+        ipass.setMerkleRoot(root, FREE_MINT);
+        vm.expectRevert(IPass.InvalidProof.selector);
+        ipass.freeMint(proof);
         vm.stopPrank();
     }
 
     function test_RevertFreeMintWithMintExceedsLimit() public {
+        bytes32[] memory _data = _getData();
+        bytes32 root = merkle.getRoot(_data);
+        bytes32[] memory proof = merkle.getProof(_data, 99);
+
         vm.startPrank(owner);
-        ipass.setSaleConfig(
-            uint32(block.timestamp),
-            uint32(block.timestamp),
-            uint64(0.05 ether),
-            uint64(0.08 ether),
-            uint8(3)
-        );
+        ipass.setSaleConfig(true, false, false);
+        ipass.setMerkleRoot(root, FREE_MINT);
+        ipass.setSupply(0);
         changePrank(alice);
-        erc1155.mint(1, 1);
         vm.expectRevert(IPass.MintExceedsLimit.selector);
-        ipass.freeMint(501);
+        ipass.freeMint(proof);
         vm.stopPrank();
     }
 
@@ -119,19 +181,31 @@ contract InVarPassTest is Test {
         bytes32[] memory proof = merkle.getProof(_data, 99);
 
         vm.startPrank(owner);
-        ipass.setMerkleRoot(root);
-        ipass.setSaleConfig(
-            uint32(block.timestamp),
-            uint32(block.timestamp),
-            uint64(0.05 ether),
-            uint64(0.08 ether),
-            uint8(3)
-        );
+        ipass.setSaleConfig(false, true, false);
+        ipass.setMerkleRoot(root, WHITELIST);
         deal(alice, 1 ether);
         changePrank(alice);
         ipass.whitelistMint{value: 0.05 ether}(proof);
         vm.stopPrank();
         assertEq(ipass.balanceOf(alice), 1);
+    }
+
+    function test_RevertWhitelistMintWithSaleTimeNotReach() public {
+        bytes32[] memory _data = _getData();
+        bytes32 root = merkle.getRoot(_data);
+        bytes32[] memory proof = merkle.getProof(_data, 99);
+
+        deal(alice, 1 ether);
+        vm.startPrank(alice);
+        vm.expectRevert(IPass.SaleTimeNotReach.selector);
+        ipass.whitelistMint{value: 0.05 ether}(proof);
+
+        changePrank(owner);
+        ipass.setMerkleRoot(root, WHITELIST);
+        changePrank(alice);
+        vm.expectRevert(IPass.SaleTimeNotReach.selector);
+        ipass.whitelistMint{value: 0.05 ether}(proof);
+        vm.stopPrank();
     }
 
     function test_RevertWhitelistMintWithAlreadyClaimed() public {
@@ -140,14 +214,8 @@ contract InVarPassTest is Test {
         bytes32[] memory proof = merkle.getProof(_data, 99);
 
         vm.startPrank(owner);
-        ipass.setMerkleRoot(root);
-        ipass.setSaleConfig(
-            uint32(block.timestamp),
-            uint32(block.timestamp),
-            uint64(0.05 ether),
-            uint64(0.08 ether),
-            uint8(3)
-        );
+        ipass.setSaleConfig(false, true, false);
+        ipass.setMerkleRoot(root, WHITELIST);
         deal(alice, 1 ether);
         changePrank(alice);
         ipass.whitelistMint{value: 0.05 ether}(proof);
@@ -162,14 +230,8 @@ contract InVarPassTest is Test {
         bytes32[] memory proof = merkle.getProof(_data, 99);
 
         vm.startPrank(owner);
-        ipass.setMerkleRoot(root);
-        ipass.setSaleConfig(
-            uint32(block.timestamp),
-            uint32(block.timestamp),
-            uint64(0.05 ether),
-            uint64(0.08 ether),
-            uint8(3)
-        );
+        ipass.setSaleConfig(false, true, false);
+        ipass.setMerkleRoot(root, WHITELIST);
         deal(bob, 1 ether);
         changePrank(bob);
         vm.expectRevert(IPass.InvalidProof.selector);
@@ -183,37 +245,12 @@ contract InVarPassTest is Test {
         bytes32[] memory proof = merkle.getProof(_data, 99);
 
         vm.startPrank(owner);
-        ipass.setMerkleRoot(root);
-        ipass.setSaleConfig(
-            uint32(block.timestamp),
-            uint32(block.timestamp),
-            uint64(0.05 ether),
-            uint64(0.08 ether),
-            uint8(3)
-        );
+        ipass.setSaleConfig(false, true, false);
+        ipass.setMerkleRoot(root, WHITELIST);
         deal(alice, 1 ether);
         changePrank(alice);
         vm.expectRevert(IPass.InsufficientEthers.selector);
         ipass.whitelistMint{value: 0.04 ether}(proof);
-        vm.stopPrank();
-    }
-
-    function test_RevertWhitelistMintWithSaleTimeNotReach() public {
-        bytes32[] memory _data = _getData();
-        bytes32[] memory proof = merkle.getProof(_data, 99);
-
-        vm.startPrank(owner);
-        ipass.setSaleConfig(
-            uint32(block.timestamp),
-            uint32(block.timestamp),
-            uint64(0.05 ether),
-            uint64(0.08 ether),
-            uint8(3)
-        );
-        deal(alice, 1 ether);
-        changePrank(alice);
-        vm.expectRevert(IPass.SaleTimeNotReach.selector);
-        ipass.whitelistMint{value: 0.05 ether}(proof);
         vm.stopPrank();
     }
 
@@ -223,15 +260,9 @@ contract InVarPassTest is Test {
         bytes32[] memory proof = merkle.getProof(_data, 99);
 
         vm.startPrank(owner);
-        ipass.setMerkleRoot(root);
+        ipass.setSaleConfig(false, true, false);
+        ipass.setMerkleRoot(root, WHITELIST);
         ipass.setSupply(0);
-        ipass.setSaleConfig(
-            uint32(block.timestamp),
-            uint32(block.timestamp),
-            uint64(0.05 ether),
-            uint64(0.08 ether),
-            uint8(3)
-        );
         deal(alice, 1 ether);
         changePrank(alice);
         vm.expectRevert(IPass.MintExceedsLimit.selector);
@@ -241,46 +272,95 @@ contract InVarPassTest is Test {
 
     function testPublicMint() public {
         vm.prank(owner);
-        ipass.setSaleConfig(
-            uint32(block.timestamp),
-            uint32(block.timestamp),
-            uint64(0.05 ether),
-            uint64(0.08 ether),
-            uint8(3)
-        );
+        ipass.setSaleConfig(false, false, true);
         deal(alice, 1 ether);
         vm.prank(alice);
         ipass.publicMint{value: 0.24 ether}(3);
         assertEq(ipass.balanceOf(alice), 3);
     }
 
+    function test_RevertPublicMintWithSaleTimeNotReach() public {
+        deal(alice, 1 ether);
+        vm.prank(alice);
+        vm.expectRevert(IPass.SaleTimeNotReach.selector);
+        ipass.publicMint{value: 0.24 ether}(3);
+    }
+
+    function test_RevertPublicMintWithInsufficientEthers() public {
+        vm.prank(owner);
+        ipass.setSaleConfig(false, false, true);
+        deal(alice, 1 ether);
+        vm.prank(alice);
+        vm.expectRevert(IPass.InsufficientEthers.selector);
+        ipass.publicMint{value: 0.2 ether}(3);
+    }
+
+    function test_RevertPublicMintWithMintExceedsLimit() public {
+        vm.startPrank(owner);
+        ipass.setSaleConfig(false, false, true);
+        ipass.setSupply(0);
+        deal(alice, 1 ether);
+        changePrank(alice);
+        vm.expectRevert(IPass.MintExceedsLimit.selector);
+        ipass.publicMint{value: 0.24 ether}(3);
+        changePrank(owner);
+        ipass.setSupply(500);
+        changePrank(alice);
+        vm.expectRevert(IPass.MintExceedsLimit.selector);
+        ipass.publicMint{value: 0.4 ether}(5);
+        vm.stopPrank();
+    }
+
     function testPremiumMint() public {
         vm.startPrank(owner);
-        // mock signed msg
-        uint256 privateKey = 0xA11CE;
-        address signature = vm.addr(privateKey);
-        ipass.setSignatureAddress(signature);
+        ipass.setSaleConfig(false, false, true);
         ipass.setIsPremiumStart(true);
-        bytes32 hashMsg = keccak256(
-            abi.encode(
-                0x5948703d1E8282f23e35a3961DDa2d885e4c2443, 
-                "Sky", 
-                1
-            ));
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, hashMsg);
-        
-        ipass.setSaleConfig(
-            uint32(block.timestamp),
-            uint32(block.timestamp),
-            uint64(0.05 ether),
-            uint64(0.08 ether),
-            uint8(3)
-        );
+        ipass.setMerkleRoot(mockRoot, TOKEN);
         deal(alice, 1 ether);
         changePrank(alice);
         ipass.publicMint{value: 0.16 ether}(2);
-        ipass.premiumMint(hashMsg, v, r, s, 1, 2);
+        ipass.premiumMint(mockProof, mockProofFlags, mockLeaves, 1, 2);
         assertEq(ipass.balanceOf(alice), 1);
+        vm.stopPrank();
+    }
+
+    function test_RevertPremiumMintWithMintNotStart() public {
+        vm.startPrank(owner);
+        ipass.setSaleConfig(false, false, true);
+        ipass.setMerkleRoot(mockRoot, TOKEN);
+        deal(alice, 1 ether);
+        changePrank(alice);
+        ipass.publicMint{value: 0.16 ether}(2);
+        vm.expectRevert(IPass.MintNotStart.selector);
+        ipass.premiumMint(mockProof, mockProofFlags, mockLeaves, 1, 2);
+        vm.stopPrank();
+    }
+
+    function test_RevertPremiumMintWithInvalidProof() public {
+        mockProof[5] = 0x97f447fda38791bf20397193931a01c4e5b544bb923cd9e3aa488fbda5244458;
+        
+        vm.startPrank(owner);
+        ipass.setSaleConfig(false, false, true);
+        ipass.setMerkleRoot(mockRoot, TOKEN);
+        ipass.setIsPremiumStart(true);
+        deal(alice, 1 ether);
+        changePrank(alice);
+        ipass.publicMint{value: 0.16 ether}(2);
+        vm.expectRevert(IPass.InvalidProof.selector);
+        ipass.premiumMint(mockProof, mockProofFlags, mockLeaves, 1, 2);
+        vm.stopPrank();
+    }
+
+    function test_RevertPremiumMintWithNotOwner() public {
+        vm.startPrank(owner);
+        ipass.setSaleConfig(false, false, true);
+        ipass.setMerkleRoot(mockRoot, TOKEN);
+        deal(alice, 1 ether);
+        changePrank(alice);
+        ipass.publicMint{value: 0.16 ether}(2);
+        changePrank(bob);
+        vm.expectRevert(IPass.MintNotStart.selector);
+        ipass.premiumMint(mockProof, mockProofFlags, mockLeaves, 1, 2);
         vm.stopPrank();
     }
 
@@ -293,7 +373,7 @@ contract InVarPassTest is Test {
         return _data;
     }
 
-    function testCreateLeaves() public {
+    function test_CreateLeaves() public {
         bytes memory result = abi.encodePacked(_createLeaves());
         emit log_named_bytes("Leaves", result);
     }

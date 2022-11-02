@@ -13,16 +13,21 @@ interface IPass {
     error InvalidSignature();
     error MintNotStart();
 
-    struct SaleConfig {
-        uint32 freemintSaleStartTime;
-        uint32 publicSaleStartTime;
-        uint64 whitelistPrice;
-        uint64 publicPrice;
-        uint8 publicMintQuantity;
+    struct SaleConfig{
+        bool isFreeMint;
+        bool isWhitelistMint;
+        bool isPublicMint;
     }
 
-    function freeMint() external;
+    struct Trees{
+        bytes32 freemintMerkleRoot;
+        bytes32 whitelistMerkleRoot;
+        bytes32 tokenMerkleRoot;
+    }
+
+    function freeMint(bytes32[] calldata _proof) external;
     function whitelistMint(bytes32[] calldata _proof) external payable;
     function publicMint(uint256 _quantity) external payable;
-    function premiumMint(bytes32 _hashMsg, uint8 _v, bytes32 _r, bytes32 _s, uint256 _earthToken, uint256 _marineToken) external;
+    function premiumMint(bytes32[] calldata _proof, bool[] calldata _proofFlags, bytes32[] memory _leaves,
+        uint256 _earthToken, uint256 _marineToken) external;
 }
