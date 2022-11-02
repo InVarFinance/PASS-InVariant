@@ -19,8 +19,8 @@ contract InVarPassTest is Test {
     Merkle internal merkle;
     bytes32[100] data;
 
-    bytes32[] mockProof;
-    bool[] mockProofFlags;
+    bytes32[17] mockProof;
+    bool[18] mockProofFlags;
     bytes32[] mockLeaves;
     bytes32 mockRoot;
 
@@ -34,50 +34,17 @@ contract InVarPassTest is Test {
         inputs[1] = "test/utils/MockLeaves.txt";
         bytes memory result = vm.ffi(inputs);
         data = abi.decode(result, (bytes32[100]));
+        inputs[1] = "test/utils/MockProof.txt";
+        result = vm.ffi(inputs);
+        mockProof = abi.decode(result, (bytes32[17]));
+        inputs[1] = "test/utils/MockProofFlags.txt";
+        result = vm.ffi(inputs);
+        mockProofFlags = abi.decode(result, (bool[18]));
 
         vm.startPrank(owner);
         ipass = new InVarPass("InVarPass", "IVP", "", 500);
         merkle = new Merkle();
         vm.stopPrank();
-
-        mockProof = new bytes32[](17);
-        mockProof[0] = 0x9538189ca6eb762597642aec4fde397f64651eb70e9b63bc89d0030da22f7582;
-        mockProof[1] = 0x9f48ad18135aa4c5cfeff3416bb25537d3e05b5d72b8f8329e12d866cd124f7b;
-        mockProof[2] = 0x7c0a3b107a3dddf93244216d85ec7e5aee12f01a83ae0e294a3bb637ff243f6b;
-        mockProof[3] = 0xa10bfbb842daf3344324e261b380b686db43b1346070a6d4bbea36a0e6a9731e;
-        mockProof[4] = 0x74d7123f11ae377247ced4df42fba1502ffccb4080aaf30ceebd4580f130d821;
-        mockProof[5] = 0x74d7123f11ae377247ced4df42fba1502ffccb4080aaf30ceebd4580f130d821;
-        mockProof[6] = 0x97f447fda38791bf20397193931a01c4e5b544bb923cd9e3aa488fbda5244458;
-        mockProof[7] = 0x7e54a703c7a4de2603ed47e075dde91eb49286f10efb2486b1a5fe3d5fe7a67c;
-        mockProof[8] = 0x8252890dc2bf4ab3bd77cf27c8bae66d140d1c02b62085e8446e42d99420d83e;
-        mockProof[9] = 0x8252890dc2bf4ab3bd77cf27c8bae66d140d1c02b62085e8446e42d99420d83e;
-        mockProof[10] = 0x3eb2d7b68338f49ce776897758e01de813d37bedfd9bfe485a0eb5e179555f21;
-        mockProof[11] = 0x3eb2d7b68338f49ce776897758e01de813d37bedfd9bfe485a0eb5e179555f21;
-        mockProof[12] = 0x28ed21c2e726ca6ca8f10a80b5441c1952b7820d3a33f24859e0c3a8d3db7ede;
-        mockProof[13] = 0xc8c92a7fc7c66783872b616b458d49980e4f61a74680901703249fd36ef9581a;
-        mockProof[14] = 0xf693a8862b55572a1a81f7e9c40ea09e95988eca33fd90cfecf96d3ee79da812;
-        mockProof[15] = 0x7a99ccb0697fa5e7586def751fee632014dd2a603449842f3d5802fc44aee6f7;
-        mockProof[16] = 0x3269a4fc321cb06d4b2ba6bb28bcbcf88e604f6159c5d5771a4501a16200c9f3;
-        
-        mockProofFlags = new bool[](18);
-        mockProofFlags[0] = false;
-        mockProofFlags[1] = false;
-        mockProofFlags[2] = false;
-        mockProofFlags[3] = false;
-        mockProofFlags[4] = false;
-        mockProofFlags[5] = false;
-        mockProofFlags[6] = false;
-        mockProofFlags[7] = false;
-        mockProofFlags[8] = false;
-        mockProofFlags[9] = false;
-        mockProofFlags[10] = false;
-        mockProofFlags[11] = false;
-        mockProofFlags[12] = false;
-        mockProofFlags[13] = false;
-        mockProofFlags[14] = false;
-        mockProofFlags[15] = false;
-        mockProofFlags[16] = true;
-        mockProofFlags[17] = false;
         
         mockLeaves = new bytes32[](2);
         mockLeaves[0] = 0x9538189ca6eb762597642aec4fde397f64651eb70e9b63bc89d0030da22f7582;
@@ -319,7 +286,7 @@ contract InVarPassTest is Test {
         deal(alice, 1 ether);
         changePrank(alice);
         ipass.publicMint{value: 0.16 ether}(2);
-        ipass.premiumMint(mockProof, mockProofFlags, mockLeaves, 1, 2);
+        ipass.premiumMint(_getMockProof(), _getMockProofFlags(), mockLeaves, 1, 2);
         assertEq(ipass.balanceOf(alice), 1);
         vm.stopPrank();
     }
@@ -332,7 +299,7 @@ contract InVarPassTest is Test {
         changePrank(alice);
         ipass.publicMint{value: 0.16 ether}(2);
         vm.expectRevert(IPass.MintNotStart.selector);
-        ipass.premiumMint(mockProof, mockProofFlags, mockLeaves, 1, 2);
+        ipass.premiumMint(_getMockProof(), _getMockProofFlags(), mockLeaves, 1, 2);
         vm.stopPrank();
     }
 
@@ -347,7 +314,7 @@ contract InVarPassTest is Test {
         changePrank(alice);
         ipass.publicMint{value: 0.16 ether}(2);
         vm.expectRevert(IPass.InvalidProof.selector);
-        ipass.premiumMint(mockProof, mockProofFlags, mockLeaves, 1, 2);
+        ipass.premiumMint(_getMockProof(), _getMockProofFlags(), mockLeaves, 1, 2);
         vm.stopPrank();
     }
 
@@ -360,7 +327,7 @@ contract InVarPassTest is Test {
         ipass.publicMint{value: 0.16 ether}(2);
         changePrank(bob);
         vm.expectRevert(IPass.MintNotStart.selector);
-        ipass.premiumMint(mockProof, mockProofFlags, mockLeaves, 1, 2);
+        ipass.premiumMint(_getMockProof(), _getMockProofFlags(), mockLeaves, 1, 2);
         vm.stopPrank();
     }
 
@@ -373,7 +340,27 @@ contract InVarPassTest is Test {
         return _data;
     }
 
-    function test_CreateLeaves() public {
+    function _getMockProof() internal view returns (bytes32[] memory) {
+        uint length = mockProof.length;
+        bytes32[] memory _mockProof = new bytes32[](length);
+        for (uint i = 0; i < length; ++i) {
+            _mockProof[i] = mockProof[i];
+        }
+        return _mockProof;
+    }
+
+    function _getMockProofFlags() internal view returns (bool[] memory) {
+        uint length = mockProofFlags.length;
+        bool[] memory _mockProofFlags = new bool[](length);
+        for (uint i = 0; i < length; ++i) {
+            _mockProofFlags[i] = mockProofFlags[i];
+        }
+        return _mockProofFlags;
+    }
+
+
+
+    function test_CreateLeaves() internal {
         bytes memory result = abi.encodePacked(_createLeaves());
         emit log_named_bytes("Leaves", result);
     }
@@ -381,10 +368,14 @@ contract InVarPassTest is Test {
     function _createLeaves() internal returns (bytes32[] memory) {
         bytes32[] memory leaves = new bytes32[](100);
         for (uint256 i = 0; i < 99; i++) {
-            leaves[i] = keccak256(abi.encodePacked(makeAddr(i.toString())));
+            leaves[i] = keccak256(bytes.concat(keccak256(abi.encode(makeAddr(i.toString())))));
         }
-        leaves[99] = keccak256(abi.encodePacked(makeAddr("alice")));
+        leaves[99] = keccak256(bytes.concat(keccak256(abi.encode(makeAddr("alice")))));
         return leaves;
     }
 
+    function test_ExportMockTree() internal {
+        emit log_named_bytes("Proof", abi.encodePacked(mockProof));
+        emit log_named_bytes("ProofFlags", abi.encodePacked(mockProofFlags));
+    }
 }

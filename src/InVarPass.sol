@@ -75,7 +75,8 @@ contract InVarPass is ERC721AQueryable, IPass, Ownable {
     function freeMint(bytes32[] calldata _proof) external {
         if (trees.freemintMerkleRoot == 0 || !saleConfig.isFreeMint) revert SaleTimeNotReach();
         // merkle proof
-        bytes32 leaf = keccak256(abi.encodePacked(msg.sender));
+        // double-hashed value to meet @openzeppelin/merkle-tree hashLeaf func
+        bytes32 leaf = keccak256(bytes.concat(keccak256(abi.encode(msg.sender))));
         if (freemintClaimed[msg.sender]) revert AlreadyClaimed();
         if (!MerkleProof.verifyCalldata(_proof, trees.freemintMerkleRoot, leaf)) revert InvalidProof();
         // free mint
@@ -87,7 +88,8 @@ contract InVarPass is ERC721AQueryable, IPass, Ownable {
     function whitelistMint(bytes32[] calldata _proof) external payable {
         if (trees.whitelistMerkleRoot == 0 || !saleConfig.isWhitelistMint) revert SaleTimeNotReach();
         // merkle proof
-        bytes32 leaf = keccak256(abi.encodePacked(msg.sender));
+        // double-hashed value to meet @openzeppelin/merkle-tree hashLeaf func
+        bytes32 leaf = keccak256(bytes.concat(keccak256(abi.encode(msg.sender))));
         if (whitelistClaimed[msg.sender]) revert AlreadyClaimed();
         if (!MerkleProof.verifyCalldata(_proof, trees.whitelistMerkleRoot, leaf)) revert InvalidProof();
         // whitelist mint
@@ -118,9 +120,9 @@ contract InVarPass is ERC721AQueryable, IPass, Ownable {
     }
 
     // for other services to verify the owner of token and the pass type
-    function verifyToken(bytes32[] calldata _proof, bytes32 _leaf,
+    function verifyToken(bytes32[] memory _proof, bytes32 _leaf,
         address _addr, uint256 _tokenId) external view returns (bool) {
-        return (MerkleProof.verifyCalldata(_proof, trees.tokenMerkleRoot, _leaf) &&
+        return (MerkleProof.verify(_proof, trees.tokenMerkleRoot, _leaf) &&
         _ownershipOf(_tokenId).addr == _addr);
     }
 
