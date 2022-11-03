@@ -13,6 +13,13 @@ interface IPass {
     error InvalidSignature();
     error MintNotStart();
 
+    enum Stage {
+        Free,
+        Whitelist,
+        Public,
+        Premium
+    }
+
     struct SaleConfig{
         bool isFreeMint;
         bool isWhitelistMint;

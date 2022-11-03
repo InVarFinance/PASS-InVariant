@@ -29,6 +29,8 @@ contract InVarPass is ERC721AQueryable, IPass, Ownable {
 
     string private _baseTokenURI;
 
+    event Mint(address indexed _to, Stage indexed _stage, uint256[] _tokenId);
+
     constructor(string memory _name, string memory _symbol, string memory baseURI, uint256 supply)
         ERC721A(_name, _symbol)
     {
@@ -82,7 +84,11 @@ contract InVarPass is ERC721AQueryable, IPass, Ownable {
         // free mint
         if (ERC721A.totalSupply() + 1 > _supply) revert MintExceedsLimit();
         freemintClaimed[msg.sender] = true;
+        uint256 tokenId = ERC721A._nextTokenId();
+        uint256[] memory tokenIds = new uint256[](1);
+        tokenIds[0] = tokenId;
         _mint(msg.sender, 1);
+        emit Mint(msg.sender, Stage.Free, tokenIds);
     }
 
     function whitelistMint(bytes32[] calldata _proof) external payable {
@@ -96,7 +102,11 @@ contract InVarPass is ERC721AQueryable, IPass, Ownable {
         if (msg.value < WHITELIST_PRICE) revert InsufficientEthers();
         if (ERC721A.totalSupply() + 1 > _supply) revert MintExceedsLimit();
         whitelistClaimed[msg.sender] = true;
+        uint256 tokenId = ERC721A._nextTokenId();
+        uint256[] memory tokenIds = new uint256[](1);
+        tokenIds[0] = tokenId;
         _mint(msg.sender, 1);
+        emit Mint(msg.sender, Stage.Whitelist, tokenIds);
     }
 
     function publicMint(uint256 _quantity) external payable {
@@ -104,7 +114,14 @@ contract InVarPass is ERC721AQueryable, IPass, Ownable {
         if (msg.value < PUBLICSALE_PRICE * _quantity) revert InsufficientEthers();
         if (ERC721A.totalSupply() + _quantity > _supply) revert MintExceedsLimit();
         if (PUBLIC_MINT_QTY < _quantity) revert MintExceedsLimit();
+        uint256 tokenId = ERC721A._nextTokenId();
+        uint256[] memory tokenIds = new uint256[](_quantity);
+        for (uint256 i = 0; i < _quantity; i++) {
+            tokenIds[i] = tokenId;
+            tokenId++;
+        }
         _mint(msg.sender, _quantity);
+        emit Mint(msg.sender, Stage.Public, tokenIds);
     }
 
     function premiumMint(bytes32[] calldata _proof, bool[] calldata _proofFlags, bytes32[] memory _leaves,
@@ -116,13 +133,17 @@ contract InVarPass is ERC721AQueryable, IPass, Ownable {
         
         _burn(_earthToken);
         _burn(_marineToken);
+        uint256 tokenId = ERC721A._nextTokenId();
+        uint256[] memory tokenIds = new uint256[](1);
+        tokenIds[0] = tokenId;
         _mint(msg.sender, 1);
+        emit Mint(msg.sender, Stage.Premium, tokenIds);
     }
 
     // for other services to verify the owner of token and the pass type
-    function verifyToken(bytes32[] memory _proof, bytes32 _leaf,
+    function verifyToken(bytes32[] calldata _proof, bytes32 _leaf,
         address _addr, uint256 _tokenId) external view returns (bool) {
-        return (MerkleProof.verify(_proof, trees.tokenMerkleRoot, _leaf) &&
+        return (MerkleProof.verifyCalldata(_proof, trees.tokenMerkleRoot, _leaf) &&
         _ownershipOf(_tokenId).addr == _addr);
     }
 

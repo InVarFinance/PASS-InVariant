@@ -40,7 +40,6 @@ contract InVarPassTest is Test {
         inputs[1] = "test/utils/MockProofFlags.txt";
         result = vm.ffi(inputs);
         mockProofFlags = abi.decode(result, (bool[18]));
-
         vm.startPrank(owner);
         ipass = new InVarPass("InVarPass", "IVP", "", 500);
         merkle = new Merkle();
@@ -358,9 +357,7 @@ contract InVarPassTest is Test {
         return _mockProofFlags;
     }
 
-
-
-    function test_CreateLeaves() internal {
+    function test_CreateLeaves() public {
         bytes memory result = abi.encodePacked(_createLeaves());
         emit log_named_bytes("Leaves", result);
     }
@@ -374,7 +371,7 @@ contract InVarPassTest is Test {
         return leaves;
     }
 
-    function test_ExportMockTree() internal {
+    function test_ExportMockTree() public {
         emit log_named_bytes("Proof", abi.encodePacked(mockProof));
         emit log_named_bytes("ProofFlags", abi.encodePacked(mockProofFlags));
     }
