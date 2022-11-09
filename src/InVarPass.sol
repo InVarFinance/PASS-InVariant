@@ -31,9 +31,12 @@ contract InVarPass is ERC721AQueryable, IPass, Ownable {
 
     event Mint(address indexed _to, Stage indexed _stage, uint256[] _tokenId);
 
-    constructor(string memory _name, string memory _symbol, string memory baseURI, uint256 supply)
-        ERC721A(_name, _symbol)
-    {
+    constructor(
+        string memory _name,
+        string memory _symbol,
+        string memory baseURI,
+        uint256 supply
+    ) ERC721A(_name, _symbol) {
         _baseTokenURI = baseURI;
         _supply = supply;
     }
@@ -79,15 +82,15 @@ contract InVarPass is ERC721AQueryable, IPass, Ownable {
         // merkle proof
         // double-hashed value to meet @openzeppelin/merkle-tree hashLeaf func
         bytes32 leaf = keccak256(bytes.concat(keccak256(abi.encode(msg.sender))));
-        if (freemintClaimed[msg.sender]) revert AlreadyClaimed();
         if (!MerkleProof.verifyCalldata(_proof, trees.freemintMerkleRoot, leaf)) revert InvalidProof();
+        if (freemintClaimed[msg.sender]) revert AlreadyClaimed();
         // free mint
         if (ERC721A.totalSupply() + 1 > _supply) revert MintExceedsLimit();
         freemintClaimed[msg.sender] = true;
-        uint256 tokenId = ERC721A._nextTokenId();
-        uint256[] memory tokenIds = new uint256[](1);
-        tokenIds[0] = tokenId;
+        
+        uint256[] memory tokenIds = _generateTokenIds();
         _mint(msg.sender, 1);
+
         emit Mint(msg.sender, Stage.Free, tokenIds);
     }
 
@@ -96,16 +99,16 @@ contract InVarPass is ERC721AQueryable, IPass, Ownable {
         // merkle proof
         // double-hashed value to meet @openzeppelin/merkle-tree hashLeaf func
         bytes32 leaf = keccak256(bytes.concat(keccak256(abi.encode(msg.sender))));
-        if (whitelistClaimed[msg.sender]) revert AlreadyClaimed();
         if (!MerkleProof.verifyCalldata(_proof, trees.whitelistMerkleRoot, leaf)) revert InvalidProof();
+        if (whitelistClaimed[msg.sender]) revert AlreadyClaimed();
         // whitelist mint
         if (msg.value < WHITELIST_PRICE) revert InsufficientEthers();
         if (ERC721A.totalSupply() + 1 > _supply) revert MintExceedsLimit();
         whitelistClaimed[msg.sender] = true;
-        uint256 tokenId = ERC721A._nextTokenId();
-        uint256[] memory tokenIds = new uint256[](1);
-        tokenIds[0] = tokenId;
+
+        uint256[] memory tokenIds = _generateTokenIds();
         _mint(msg.sender, 1);
+
         emit Mint(msg.sender, Stage.Whitelist, tokenIds);
     }
 
@@ -114,37 +117,63 @@ contract InVarPass is ERC721AQueryable, IPass, Ownable {
         if (msg.value < PUBLICSALE_PRICE * _quantity) revert InsufficientEthers();
         if (ERC721A.totalSupply() + _quantity > _supply) revert MintExceedsLimit();
         if (PUBLIC_MINT_QTY < _quantity) revert MintExceedsLimit();
-        uint256 tokenId = ERC721A._nextTokenId();
-        uint256[] memory tokenIds = new uint256[](_quantity);
-        for (uint256 i = 0; i < _quantity; i++) {
-            tokenIds[i] = tokenId;
-            tokenId++;
-        }
+
+        uint256[] memory tokenIds = _generateTokenIds(_quantity);
         _mint(msg.sender, _quantity);
+
         emit Mint(msg.sender, Stage.Public, tokenIds);
     }
 
-    function premiumMint(bytes32[] calldata _proof, bool[] calldata _proofFlags, bytes32[] memory _leaves,
-        uint256 _earthToken, uint256 _marineToken) external {
+    function premiumMint(
+        bytes32[] calldata _proof,
+        bool[] calldata _proofFlags,
+        bytes32[] memory _leaves,
+        uint256 _earthToken,
+        uint256 _marineToken
+    ) external {
         if (!_isPremiumStart) revert MintNotStart();
-        if (!MerkleProof.multiProofVerifyCalldata(_proof, _proofFlags, trees.tokenMerkleRoot, _leaves)) revert InvalidProof();
-        if (!(_ownershipOf(_earthToken).addr == msg.sender && 
-            _ownershipOf(_marineToken).addr == msg.sender)) revert NotOwner();
-        
+        if (!MerkleProof.multiProofVerifyCalldata(
+            _proof,
+            _proofFlags,
+            trees.tokenMerkleRoot,
+            _leaves)) revert InvalidProof();
+        if (!(_ownershipOf(_earthToken).addr == msg.sender &&
+                _ownershipOf(_marineToken).addr == msg.sender)) revert NotOwner();
+
         _burn(_earthToken);
         _burn(_marineToken);
-        uint256 tokenId = ERC721A._nextTokenId();
-        uint256[] memory tokenIds = new uint256[](1);
-        tokenIds[0] = tokenId;
+        uint256[] memory tokenIds = _generateTokenIds();
         _mint(msg.sender, 1);
+        
         emit Mint(msg.sender, Stage.Premium, tokenIds);
     }
 
+    function _generateTokenIds() internal view returns (uint256[] memory) {
+        return _generateTokenIds(1);
+    }
+
+    function _generateTokenIds(uint256 _size) internal view returns (uint256[] memory) {
+        uint256 tokenId = ERC721A._nextTokenId();
+        uint256[] memory tokenIds = new uint256[](_size);
+        for (uint256 i = 0; i < _size; i++) {
+            tokenIds[i] = tokenId;
+            tokenId++;
+        }
+        return tokenIds;
+    }
+
     // for other services to verify the owner of token and the pass type
-    function verifyToken(bytes32[] calldata _proof, bytes32 _leaf,
-        address _addr, uint256 _tokenId) external view returns (bool) {
-        return (MerkleProof.verifyCalldata(_proof, trees.tokenMerkleRoot, _leaf) &&
-        _ownershipOf(_tokenId).addr == _addr);
+    function verifyToken(
+        bytes32[] calldata _proof,
+        bytes32 _leaf,
+        address _addr,
+        uint256 _tokenId
+    ) external view returns (bool) {
+        return (MerkleProof.verifyCalldata(
+            _proof,
+            trees.tokenMerkleRoot,
+            _leaf
+        ) && _ownershipOf(_tokenId).addr == _addr);
     }
 
     // override
