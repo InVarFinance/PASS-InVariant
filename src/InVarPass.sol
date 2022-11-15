@@ -4,9 +4,10 @@ pragma solidity ^0.8.13;
 import "ERC721A/extensions/ERC721AQueryable.sol";
 import "openzeppelin-contracts/utils/cryptography/MerkleProof.sol";
 import "openzeppelin-contracts/access/Ownable.sol";
+import "openzeppelin-contracts/security/ReentrancyGuard.sol";
 import "./IPass.sol";
 
-contract InVarPass is ERC721AQueryable, IPass, Ownable {
+contract InVarPass is ERC721AQueryable, IPass, Ownable, ReentrancyGuard {
     SaleConfig public saleConfig;
     Trees public trees;
 
@@ -94,7 +95,7 @@ contract InVarPass is ERC721AQueryable, IPass, Ownable {
         emit Mint(msg.sender, Stage.Free, tokenIds);
     }
 
-    function whitelistMint(bytes32[] calldata _proof) external payable {
+    function whitelistMint(bytes32[] calldata _proof) external payable nonReentrant {
         if (trees.whitelistMerkleRoot == 0 || !saleConfig.isWhitelistMint) revert SaleTimeNotReach();
         // merkle proof
         // double-hashed value to meet @openzeppelin/merkle-tree hashLeaf func
@@ -112,7 +113,7 @@ contract InVarPass is ERC721AQueryable, IPass, Ownable {
         emit Mint(msg.sender, Stage.Whitelist, tokenIds);
     }
 
-    function publicMint(uint256 _quantity) external payable {
+    function publicMint(uint256 _quantity) external payable nonReentrant {
         if (!saleConfig.isPublicMint) revert SaleTimeNotReach();
         if (msg.value < PUBLICSALE_PRICE * _quantity) revert InsufficientEthers();
         if (ERC721A.totalSupply() + _quantity > _supply) revert MintExceedsLimit();

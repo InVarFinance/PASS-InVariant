@@ -45,4 +45,11 @@ interface IPass {
         uint256 _earthToken,
         uint256 _marineToken
     ) external;
+
+    function verifyToken(
+        bytes32[] calldata _proof,
+        bytes32 _leaf,
+        address _addr,
+        uint256 _tokenId
+    ) external view returns (bool);
 }
