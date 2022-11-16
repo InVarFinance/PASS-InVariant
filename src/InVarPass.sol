@@ -19,6 +19,8 @@ contract InVarPass is ERC721AQueryable, IPass, Ownable, ReentrancyGuard {
     uint256 constant PUBLICSALE_PRICE = 0.08 ether;
     uint256 constant PUBLIC_MINT_QTY = 3;
 
+    address constant MULTISIG = address(0);
+
     // total supply
     uint256 private _supply;
 
@@ -78,6 +80,11 @@ contract InVarPass is ERC721AQueryable, IPass, Ownable, ReentrancyGuard {
         _isPremiumStart = _start;
     }
 
+    function withdraw() external onlyOwner nonReentrant {
+        (bool success, ) = payable(MULTISIG).call{value: address(this).balance}("");
+        if (!success) revert EthersTransferErr();
+    }
+
     function freeMint(bytes32[] calldata _proof) external {
         if (trees.freemintMerkleRoot == 0 || !saleConfig.isFreeMint) revert SaleTimeNotReach();
         // merkle proof
@@ -103,25 +110,25 @@ contract InVarPass is ERC721AQueryable, IPass, Ownable, ReentrancyGuard {
         if (!MerkleProof.verifyCalldata(_proof, trees.whitelistMerkleRoot, leaf)) revert InvalidProof();
         if (whitelistClaimed[msg.sender]) revert AlreadyClaimed();
         // whitelist mint
-        if (msg.value < WHITELIST_PRICE) revert InsufficientEthers();
         if (ERC721A.totalSupply() + 1 > _supply) revert MintExceedsLimit();
         whitelistClaimed[msg.sender] = true;
 
         uint256[] memory tokenIds = _generateTokenIds();
         _mint(msg.sender, 1);
+        _refundIfOver(WHITELIST_PRICE);
 
         emit Mint(msg.sender, Stage.Whitelist, tokenIds);
     }
 
     function publicMint(uint256 _quantity) external payable nonReentrant {
         if (!saleConfig.isPublicMint) revert SaleTimeNotReach();
-        if (msg.value < PUBLICSALE_PRICE * _quantity) revert InsufficientEthers();
         if (ERC721A.totalSupply() + _quantity > _supply) revert MintExceedsLimit();
         if (PUBLIC_MINT_QTY < _quantity) revert MintExceedsLimit();
 
         uint256[] memory tokenIds = _generateTokenIds(_quantity);
         _mint(msg.sender, _quantity);
-
+        _refundIfOver(PUBLICSALE_PRICE * _quantity);
+        
         emit Mint(msg.sender, Stage.Public, tokenIds);
     }
 
@@ -149,11 +156,19 @@ contract InVarPass is ERC721AQueryable, IPass, Ownable, ReentrancyGuard {
         emit Mint(msg.sender, Stage.Premium, tokenIds);
     }
 
-    function _generateTokenIds() internal view returns (uint256[] memory) {
+    function _refundIfOver(uint256 _price) private {
+        if (msg.value < _price) revert InsufficientEthers();
+        if (msg.value > _price) {
+            (bool success, ) = payable(msg.sender).call{value: msg.value - _price}("");
+            if (!success) revert EthersTransferErr();
+        }
+    }
+
+    function _generateTokenIds() private view returns (uint256[] memory) {
         return _generateTokenIds(1);
     }
 
-    function _generateTokenIds(uint256 _size) internal view returns (uint256[] memory) {
+    function _generateTokenIds(uint256 _size) private view returns (uint256[] memory) {
         uint256 tokenId = ERC721A._nextTokenId();
         uint256[] memory tokenIds = new uint256[](_size);
         for (uint256 i = 0; i < _size; i++) {

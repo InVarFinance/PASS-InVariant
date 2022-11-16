@@ -3,6 +3,7 @@ pragma solidity ^0.8.0;
 
 interface IPass {
     error AlreadyClaimed();
+    error EthersTransferErr();
     error InsufficientEthers();
     error InvalidProof();
     error InvalidSignature();
