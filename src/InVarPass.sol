@@ -24,9 +24,8 @@ contract InVarPass is ERC721AQueryable, IPass, Ownable, ReentrancyGuard {
     // total supply
     uint256 private _supply;
 
-    // merkle trees
-    mapping(address => bool) public freemintClaimed;
-    mapping(address => bool) public whitelistClaimed;
+    // mint records
+    mapping(address => MintRecord) public mintRecords;
 
     bool private _isPremiumStart;
 
@@ -91,10 +90,10 @@ contract InVarPass is ERC721AQueryable, IPass, Ownable, ReentrancyGuard {
         // double-hashed value to meet @openzeppelin/merkle-tree hashLeaf func
         bytes32 leaf = keccak256(bytes.concat(keccak256(abi.encode(msg.sender))));
         if (!MerkleProof.verifyCalldata(_proof, trees.freemintMerkleRoot, leaf)) revert InvalidProof();
-        if (freemintClaimed[msg.sender]) revert AlreadyClaimed();
+        if (mintRecords[msg.sender].freemintClaimed) revert AlreadyClaimed();
         // free mint
         if (ERC721A.totalSupply() + 1 > _supply) revert MintExceedsLimit();
-        freemintClaimed[msg.sender] = true;
+        mintRecords[msg.sender].freemintClaimed = true;
         
         uint256[] memory tokenIds = _generateTokenIds();
         _mint(msg.sender, 1);
@@ -108,10 +107,10 @@ contract InVarPass is ERC721AQueryable, IPass, Ownable, ReentrancyGuard {
         // double-hashed value to meet @openzeppelin/merkle-tree hashLeaf func
         bytes32 leaf = keccak256(bytes.concat(keccak256(abi.encode(msg.sender))));
         if (!MerkleProof.verifyCalldata(_proof, trees.whitelistMerkleRoot, leaf)) revert InvalidProof();
-        if (whitelistClaimed[msg.sender]) revert AlreadyClaimed();
+        if (mintRecords[msg.sender].whitelistClaimed) revert AlreadyClaimed();
         // whitelist mint
         if (ERC721A.totalSupply() + 1 > _supply) revert MintExceedsLimit();
-        whitelistClaimed[msg.sender] = true;
+        mintRecords[msg.sender].whitelistClaimed = true;
 
         uint256[] memory tokenIds = _generateTokenIds();
         _mint(msg.sender, 1);
@@ -122,9 +121,11 @@ contract InVarPass is ERC721AQueryable, IPass, Ownable, ReentrancyGuard {
 
     function publicMint(uint256 _quantity) external payable nonReentrant {
         if (!saleConfig.isPublicMint) revert SaleTimeNotReach();
-        if (ERC721A.totalSupply() + _quantity > _supply) revert MintExceedsLimit();
-        if (PUBLIC_MINT_QTY < _quantity) revert MintExceedsLimit();
-
+        if (ERC721A.totalSupply() + _quantity > _supply ||
+            PUBLIC_MINT_QTY < mintRecords[msg.sender].publicMinted + _quantity) 
+            revert MintExceedsLimit();
+        mintRecords[msg.sender].publicMinted += _quantity;
+        
         uint256[] memory tokenIds = _generateTokenIds(_quantity);
         _mint(msg.sender, _quantity);
         _refundIfOver(PUBLICSALE_PRICE * _quantity);

@@ -33,6 +33,12 @@ interface IPass {
         bytes32 tokenMerkleRoot;
     }
 
+    struct MintRecord {
+        bool freemintClaimed;
+        bool whitelistClaimed;
+        uint256 publicMinted;
+    }
+
     function freeMint(bytes32[] calldata _proof) external;
 
     function whitelistMint(bytes32[] calldata _proof) external payable;
