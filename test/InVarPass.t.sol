@@ -330,6 +330,26 @@ contract InVarPassTest is Test {
         vm.stopPrank();
     }
 
+    function testVerifyToken() public {
+        bytes32 typeRoot = 0x5a5d04b661ff1b226a9c8b653ba14f54a61536e28326888266b306810a348fb8;
+        bytes32[] memory proof = new bytes32[](5);
+        proof[0] = 0x92eba6af23f81773d00b64f5a68ba1a185f3641e6023e793108d6f34aa07d754;
+        proof[1] = 0xd47d567ab0f8e8ee240e68596f9c15317360ded93e3a2b3d90e34e6371cc1d83;
+        proof[2] = 0xe1f65d23d6fadb8bbd654f009433f3ec7bd90689ebf403ae176fbd0d84498c3f;
+        proof[3] = 0x036dbe10865858483221907e89744df087214860fdf00d99c7e6785c543a1b25;
+        proof[4] = 0x4560272f7981e583b73085daf1e48959b14905068b6ac0abe7da1f36eff5367a;
+
+        vm.startPrank(owner);
+        ipass.setSaleConfig(false, false, true);
+        ipass.setMerkleRoot(typeRoot, TOKEN);
+        deal(alice, 1 ether);
+        changePrank(alice);
+        ipass.publicMint{value: 0.24 ether}(3);
+        vm.stopPrank();
+        bool result = ipass.verifyToken(proof, abi.encode("Test"), alice, 1);
+        assertTrue(result);
+    }
+
     function _getData() internal view returns (bytes32[] memory) {
         bytes32[] memory _data = new bytes32[](data.length);
         uint length = data.length;

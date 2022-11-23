@@ -55,7 +55,7 @@ interface IPass {
 
     function verifyToken(
         bytes32[] calldata _proof,
-        bytes32 _leaf,
+        bytes calldata _leaf,
         address _addr,
         uint256 _tokenId
     ) external view returns (bool);

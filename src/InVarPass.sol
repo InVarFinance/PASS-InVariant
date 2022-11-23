@@ -182,15 +182,17 @@ contract InVarPass is ERC721AQueryable, IPass, Ownable, ReentrancyGuard {
     // for other services to verify the owner of token and the pass type
     function verifyToken(
         bytes32[] calldata _proof,
-        bytes32 _leaf,
+        bytes calldata _type,
         address _addr,
         uint256 _tokenId
     ) external view returns (bool) {
+        string memory passType = abi.decode(_type, (string));
+        bytes32 leaf = keccak256(bytes.concat(keccak256(abi.encode(_tokenId, passType))));
         return (MerkleProof.verifyCalldata(
             _proof,
             trees.tokenMerkleRoot,
-            _leaf
-        ) && _ownershipOf(_tokenId).addr == _addr);
+            leaf
+        ) && explicitOwnershipOf(_tokenId).addr == _addr);
     }
 
     // override
