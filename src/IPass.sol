@@ -7,6 +7,7 @@ interface IPass {
     error InsufficientEthers();
     error InvalidProof();
     error InvalidSignature();
+    error InvalidType();
     error MintExceedsLimit();
     error MintNotStart();
     error NotOwner();
@@ -21,10 +22,20 @@ interface IPass {
         Premium
     }
 
+    event Mint(address indexed _to, Stage indexed _stage, uint256 _tokenId);
+
+    struct Metadata {
+        string imgUrl;
+        string tokenNamePrefix;
+        string description;
+        string properties;
+    }
+
     struct SaleConfig {
         bool isFreeMint;
         bool isWhitelistMint;
         bool isPublicMint;
+        bool isPremiumMint;
     }
 
     struct Trees {
@@ -36,7 +47,7 @@ interface IPass {
     struct MintRecord {
         bool freemintClaimed;
         bool whitelistClaimed;
-        uint256 publicMinted;
+        uint8 publicMinted;
     }
 
     function freeMint(bytes32[] calldata _proof) external;
@@ -55,7 +66,7 @@ interface IPass {
 
     function verifyToken(
         bytes32[] calldata _proof,
-        bytes calldata _leaf,
+        string calldata _leaf,
         address _addr,
         uint256 _tokenId
     ) external view returns (bool);
