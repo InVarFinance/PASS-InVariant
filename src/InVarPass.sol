@@ -1,17 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.13;
 
-import "openzeppelin-contracts/token/ERC721/extensions/ERC721Enumerable.sol";
-import "./IPass.sol";
-import "openzeppelin-contracts/access/Ownable.sol";
-import "openzeppelin-contracts/security/ReentrancyGuard.sol";
+import {ERC721Enumerable, ERC721} from "openzeppelin-contracts/token/ERC721/extensions/ERC721Enumerable.sol";
+import {IPass} from "./IPass.sol";
+import {IPassConstants} from "./IPassConstants.sol";
+import {Ownable} from "openzeppelin-contracts/access/Ownable.sol";
+import {ReentrancyGuard} from "openzeppelin-contracts/security/ReentrancyGuard.sol";
 
-import "openzeppelin-contracts/utils/cryptography/MerkleProof.sol";
-import "openzeppelin-contracts/utils/Base64.sol";
-import "openzeppelin-contracts/utils/Strings.sol";
-import "openzeppelin-contracts/utils/Counters.sol";
+import {MerkleProof} from "openzeppelin-contracts/utils/cryptography/MerkleProof.sol";
+import {Base64} from "openzeppelin-contracts/utils/Base64.sol";
+import {Strings} from "openzeppelin-contracts/utils/Strings.sol";
+import {Counters} from "openzeppelin-contracts/utils/Counters.sol";
 
-contract InVarPass is ERC721Enumerable, IPass, Ownable, ReentrancyGuard {
+contract InVarPass is ERC721Enumerable, IPass, IPassConstants, Ownable, ReentrancyGuard {
     using Strings for uint256;
     using Counters for Counters.Counter;
 
@@ -20,24 +21,22 @@ contract InVarPass is ERC721Enumerable, IPass, Ownable, ReentrancyGuard {
     SaleConfig public saleConfig;
     Trees public trees;
 
-    bytes32 constant FREE_MINT =
-        0xaca2929d09e74b1bd257acca0d40349ade3291350b31ee1e04b706c764e53859;
-    bytes32 constant WHITELIST =
-        0xc3d232a6c0e2fb343117f17a5ff344a1a84769265318c6d7a8d7d9b2f8bb49e3;
-    bytes32 constant TOKEN =
-        0x1317f51c845ce3bfb7c268e5337a825f12f3d0af9584c2bbfbf4e64e314eaf73;
-
-    uint256 constant WHITELIST_PRICE = 0.05 ether;
-    uint256 constant PUBLICSALE_PRICE = 0.1 ether;
-    uint256 constant PUBLIC_MINT_QTY = 3;
-    address constant MULTISIG = address(0);
-
     // total supply
     uint256 private MAX_SUPPLY;
-    uint256 private _premiumTokenIds = 10_000;
+    uint256 private _premiumTokenIds;
 
     // mint records
     mapping(address => MintRecord) public mintRecords;
+
+    constructor(
+        string memory _name,
+        string memory _symbol,
+        uint256 _supply,
+        uint256 _premium
+    ) ERC721(_name, _symbol) {
+        MAX_SUPPLY = _supply;
+        _premiumTokenIds = _premium;
+    }
 
     /**
      *  =================== Metadata ===================
@@ -72,7 +71,7 @@ contract InVarPass is ERC721Enumerable, IPass, Ownable, ReentrancyGuard {
                             _tokenName(metadata.tokenNamePrefix, _tokenId),
                             '","description":"',
                             metadata.description,
-                            '","external_url":"https://app.invar.finance/sftdemo"'
+                            '","external_url":"https://app.invar.finance/invaria2222"'
                             ',"image":"',
                             metadata.imgUrl,
                             '","properties":',
@@ -90,14 +89,6 @@ contract InVarPass is ERC721Enumerable, IPass, Ownable, ReentrancyGuard {
         returns (string memory)
     {
         return string(abi.encodePacked(prefix_, " #", tokenId_.toString()));
-    }
-
-    constructor(
-        string memory _name,
-        string memory _symbol,
-        uint256 _supply
-    ) ERC721(_name, _symbol) {
-        MAX_SUPPLY = _supply;
     }
 
     /**
@@ -135,9 +126,7 @@ contract InVarPass is ERC721Enumerable, IPass, Ownable, ReentrancyGuard {
     }
 
     function withdraw() external onlyOwner nonReentrant {
-        (bool success, ) = payable(MULTISIG).call{value: address(this).balance}(
-            ""
-        );
+        (bool success, ) = payable(MULTISIG).call{value: address(this).balance}("");
         if (!success) revert EthersTransferErr();
     }
 
@@ -150,15 +139,11 @@ contract InVarPass is ERC721Enumerable, IPass, Ownable, ReentrancyGuard {
         bytes32[] calldata _tokenProof,
         string calldata _type
     ) external {
-        if (trees.freemintMerkleRoot == 0 || !saleConfig.isFreeMint)
-            revert MintNotStart();
+        if (trees.freemintMerkleRoot == 0 || !saleConfig.isFreeMint) revert MintNotStart();
         // merkle proof
-        // double-hashed value to meet @openzeppelin/merkle-tree hashLeaf func
-        bytes32 leaf = keccak256(
-            bytes.concat(keccak256(abi.encode(msg.sender)))
-        );
-        if (!MerkleProof.verifyCalldata(_proof, trees.freemintMerkleRoot, leaf))
-            revert InvalidProof();
+        // double-hashed value to meet oz/merkle-tree hashLeaf func
+        bytes32 leaf = keccak256(bytes.concat(keccak256(abi.encode(msg.sender))));
+        if (!MerkleProof.verifyCalldata(_proof, trees.freemintMerkleRoot, leaf)) revert InvalidProof();
         if (mintRecords[msg.sender].freemintClaimed) revert AlreadyClaimed();
         // free mint
         uint256 tokenId = _generateTokenId();
@@ -174,16 +159,11 @@ contract InVarPass is ERC721Enumerable, IPass, Ownable, ReentrancyGuard {
         bytes32[] calldata _tokenProof,
         string calldata _type
     ) external payable nonReentrant {
-        if (trees.whitelistMerkleRoot == 0 || !saleConfig.isWhitelistMint)
-            revert MintNotStart();
+        if (trees.whitelistMerkleRoot == 0 || !saleConfig.isWhitelistMint) revert MintNotStart();
         // merkle proof
-        // double-hashed value to meet @openzeppelin/merkle-tree hashLeaf func
-        bytes32 leaf = keccak256(
-            bytes.concat(keccak256(abi.encode(msg.sender)))
-        );
-        if (
-            !MerkleProof.verifyCalldata(_proof, trees.whitelistMerkleRoot, leaf)
-        ) revert InvalidProof();
+        // double-hashed value to meet oz/merkle-tree hashLeaf func
+        bytes32 leaf = keccak256(bytes.concat(keccak256(abi.encode(msg.sender))));
+        if (!MerkleProof.verifyCalldata(_proof, trees.whitelistMerkleRoot, leaf)) revert InvalidProof();
         if (mintRecords[msg.sender].whitelistClaimed) revert AlreadyClaimed();
         // whitelist mint
         uint256 tokenId = _generateTokenId();
@@ -197,18 +177,17 @@ contract InVarPass is ERC721Enumerable, IPass, Ownable, ReentrancyGuard {
 
     function publicMint(
         uint256 _quantity,
-        bytes32[] calldata _tokenProof,
+        bytes32[][] calldata _tokenProofs,
         string[] calldata _types
     ) external payable nonReentrant {
         if (!saleConfig.isPublicMint) revert MintNotStart();
-        if (PUBLIC_MINT_QTY < mintRecords[msg.sender].publicMinted + _quantity)
-            revert MintExceedsLimit();
+        if (PUBLIC_MINT_QTY < mintRecords[msg.sender].publicMinted + _quantity) revert MintExceedsLimit();
         mintRecords[msg.sender].publicMinted += uint8(_quantity);
 
         for (uint256 i = 0; i < _quantity; i++) {
             uint256 tokenId = _generateTokenId();
-            _safeMint(msg.sender, _quantity);
-            _setTokenType(_tokenProof, tokenId, _types[i], msg.sender);
+            _safeMint(msg.sender, tokenId);
+            _setTokenType(_tokenProofs[i], tokenId, _types[i], msg.sender);
 
             emit Mint(msg.sender, Stage.Public, tokenId);
         }
@@ -223,40 +202,40 @@ contract InVarPass is ERC721Enumerable, IPass, Ownable, ReentrancyGuard {
         address _owner
     ) internal {
         // on-chain metadata setup
-        if (!verifyToken(_proof, _tokenId, _type, _owner))
-            revert InvalidProof();
+        if (!verifyToken(_proof, _tokenId, _type, _owner)) revert InvalidProof();
         tokenTypes[_tokenId] = keccak256(abi.encodePacked(_type));
     }
 
     function premiumMint(
         bytes32[] calldata _proof,
         bool[] calldata _proofFlags,
-        bytes32[] memory _leaves,
-        uint256 _earthToken,
-        uint256 _oceanToken,
-        string calldata _type
+        uint256[] calldata _tokens,
+        string[] calldata _types
     ) external {
         if (!saleConfig.isPremiumMint) revert MintNotStart();
-        // leaves: earth, ocean, sky
+        
+        uint256 length = _tokens.length;
+        if (length != _types.length) revert MismatchLength();
+        bytes32[] memory leave = new bytes32[](length);
+        for (uint8 i = 0; i < length; i++) {
+            if (!(ownerOf(_tokens[i]) == msg.sender)) revert NotOwner();
+            leave[i] = keccak256(bytes.concat(keccak256(abi.encode(_tokens[i], _types[i]))));
+            _burn(_tokens[i]);
+        }
+
+        // leave: earth, ocean
         if (
             !MerkleProof.multiProofVerifyCalldata(
                 _proof,
                 _proofFlags,
                 trees.tokenMerkleRoot,
-                _leaves
+                leave
             )
         ) revert InvalidProof();
-        if (
-            !(ownerOf(_earthToken) == msg.sender &&
-                ownerOf(_oceanToken) == msg.sender)
-        ) revert NotOwner();
 
-        _burn(_earthToken);
-        _burn(_oceanToken);
-
-        uint256 tokenId = _premiumTokenId();
+        uint256 tokenId = _getPremiumTokenId();
         _safeMint(msg.sender, tokenId);
-        tokenTypes[tokenId] = keccak256(abi.encodePacked(_type));
+        tokenTypes[tokenId] = PREMIUM_TYPE;
 
         emit Mint(msg.sender, Stage.Premium, tokenId);
     }
@@ -271,14 +250,14 @@ contract InVarPass is ERC721Enumerable, IPass, Ownable, ReentrancyGuard {
         }
     }
 
-    function _generateTokenId() private view returns (uint256) {
+    function _generateTokenId() private returns (uint256) {
         _tokenIds.increment();
         uint256 tokenId = _tokenIds.current();
-        if (tokenId == MAX_SUPPLY) revert MintExceedsLimit();
+        if (tokenId >= MAX_SUPPLY) revert MintExceedsLimit();
         return tokenId;
     }
 
-    function _premiumTokenId() private view returns (uint256) {
+    function _getPremiumTokenId() private view returns (uint256) {
         return _premiumTokenIds + 1;
     }
 
