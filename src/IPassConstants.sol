@@ -9,8 +9,8 @@ contract IPassConstants{
     bytes32 constant TOKEN =
         0x1317f51c845ce3bfb7c268e5337a825f12f3d0af9584c2bbfbf4e64e314eaf73;
 
-    bytes32 constant PREMIUM_TYPE = 
-        0x8aae35e5b7d4a4d17030ddbae29872bbd179fd4a375f7e2a3b05ac1f0a2e4d16;
+    bytes constant EARTH = hex"4561727468";
+    bytes constant OCEAN = hex"4f6365616e";
 
     uint256 constant WHITELIST_PRICE = 0.05 ether;
     uint256 constant PUBLICSALE_PRICE = 0.1 ether;

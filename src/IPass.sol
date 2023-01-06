@@ -8,7 +8,6 @@ interface IPass {
     error InvalidProof();
     error MintExceedsLimit();
     error MintNotStart();
-    error MismatchLength();
     error NotOwner();
 
     enum Stage {
@@ -19,13 +18,6 @@ interface IPass {
     }
 
     event Mint(address indexed _to, Stage indexed _stage, uint256 _tokenId);
-
-    struct Metadata {
-        string imgUrl;
-        string tokenNamePrefix;
-        string description;
-        string properties;
-    }
 
     struct SaleConfig {
         bool isFreeMint;
@@ -48,14 +40,6 @@ interface IPass {
     /**
      *  =================== Owner Operation ===================
      */
-
-    /**
-     * @notice Owner sets metadata for the pass type,
-     *  so metadata is able to fetch on-chain
-     * @param _type The pass type
-     * @param _metadata The metadata
-     */
-    function setMetadata(string calldata _type, Metadata memory _metadata) external;
 
     /**
      * @notice Owner sets the current sale stage
@@ -87,26 +71,20 @@ interface IPass {
     /**
      * @notice User who is on free mint list can mint the pass
      * @param _proof The merkle proof of the free mint merkle tree
-     * @param _tokenProof The merkle proof of the token merkle tree
-     * @param _type The type of the pass
      */
-    function freeMint(bytes32[] calldata _proof, bytes32[] calldata _tokenProof, string calldata _type) external;
+    function freeMint(bytes32[] calldata _proof) external;
 
     /**
      * @notice User who is on white list can mint the pass
      * @param _proof The merkle proof of the white mint merkle tree
-     * @param _tokenProof The merkle proof of the token merkle tree
-     * @param _type The type of the pass
      */
-    function whitelistMint(bytes32[] calldata _proof, bytes32[] calldata _tokenProof, string calldata _type) external payable;
+    function whitelistMint(bytes32[] calldata _proof) external payable;
 
     /**
      * @notice User can mint 3 pass at most
      * @param _quantity The quantity that user want to mint
-     * @param _tokenProofs The merkle proofs of the token merkle tree
-     * @param _types The types of the passes
      */
-    function publicMint(uint256 _quantity, bytes32[][] calldata _tokenProofs, string[] calldata _types) external payable;
+    function publicMint(uint256 _quantity) external payable;
 
     /**
      * @notice User mints premium pass by burning their holding passes,
@@ -114,12 +92,11 @@ interface IPass {
      * @param _proof The multi proof of the token merkle tree
      * @param _proofFlags The proof flags of the token merkle tree
      * @param _tokens The tokens that user is holding
-     * @param _types The types of the passes
      */
-    function premiumMint(bytes32[] calldata _proof, bool[] calldata _proofFlags, uint256[] calldata _tokens, string[] calldata _types) external;
+    function premiumMint(bytes32[] calldata _proof, bool[] calldata _proofFlags, uint256[] calldata _tokens) external;
 
     /**
      * @notice This function is for the future projects use
      */
-    function verifyToken(bytes32[] calldata _proof, uint256 _tokenId, string calldata _type, address _owner) external view returns (bool);
+    function verifyToken(bytes32[] calldata _proof, uint256 _tokenId, bytes calldata _type, address _owner) external view returns (bool);
 }
