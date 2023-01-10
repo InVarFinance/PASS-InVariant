@@ -41,6 +41,10 @@ contract InVarPass is ERC721Enumerable, IPass, IPassConstants, Ownable, Reentran
         _baseuri = _uri;
     }
 
+    function supportsInterface(bytes4 interfaceId) public view virtual override(ERC721Enumerable, CantBeEvil) returns (bool) {
+        return super.supportsInterface(interfaceId);
+    }
+
     /**
      *  =================== Owner Operation ===================
      */
