@@ -1,5 +1,7 @@
 ERC721A/=lib/ERC721A/contracts/
+a16z-contracts/=lib/a16z-contracts/contracts/
 ds-test/=lib/forge-std/lib/ds-test/src/
 forge-std/=lib/forge-std/src/
 murky/=lib/murky/src/
 openzeppelin-contracts/=lib/openzeppelin-contracts/contracts/
+@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/

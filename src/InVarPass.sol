@@ -7,10 +7,12 @@ import {IPassConstants} from "./IPassConstants.sol";
 import {Ownable} from "openzeppelin-contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "openzeppelin-contracts/security/ReentrancyGuard.sol";
 
+import {CantBeEvil, LicenseVersion} from "a16z-contracts/licenses/CantBeEvil.sol";
+
 import {MerkleProof} from "openzeppelin-contracts/utils/cryptography/MerkleProof.sol";
 import {Counters} from "openzeppelin-contracts/utils/Counters.sol";
 
-contract InVarPass is ERC721Enumerable, IPass, IPassConstants, Ownable, ReentrancyGuard {
+contract InVarPass is ERC721Enumerable, IPass, IPassConstants, Ownable, ReentrancyGuard, CantBeEvil {
     using Counters for Counters.Counter;
 
     Counters.Counter private _tokenIds;
@@ -33,7 +35,7 @@ contract InVarPass is ERC721Enumerable, IPass, IPassConstants, Ownable, Reentran
         uint256 _supply,
         uint256 _premium,
         string memory _uri
-    ) ERC721(_name, _symbol) {
+    ) ERC721(_name, _symbol) CantBeEvil(LicenseVersion.PERSONAL_NO_HATE) {
         MAX_SUPPLY = _supply;
         _premiumTokenIds = _premium;
         _baseuri = _uri;
