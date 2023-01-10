@@ -54,6 +54,12 @@ interface IPass {
     function setMerkleRoot(bytes32 _root, bytes32 _name) external;
 
     /**
+     * @notice Owner sets the start premium token id
+     * @param _premium The start premium token start id
+     */
+    function setPremium(uint256 _premium) external;
+
+    /**
      * @notice Owner sets the max supply for the pass
      * @param _supply Total pass supply
      */

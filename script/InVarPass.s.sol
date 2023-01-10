@@ -9,6 +9,6 @@ contract InVarPassScript is Script {
 
     function run() public {
         vm.broadcast();
-        new InVarPass("InVarPass", "IVP", 500, 4, "");
+        new InVarPass("InVarPass", "IVP", 500, 30, "");
     }
 }

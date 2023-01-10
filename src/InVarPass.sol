@@ -73,6 +73,10 @@ contract InVarPass is ERC721Enumerable, IPass, IPassConstants, Ownable, Reentran
         _baseuri = _uri;
     }
 
+    function setPremium(uint256 _premium) external onlyOwner {
+        _premiumTokenIds = _premium;
+    }
+
     function setMaxSupply(uint256 _supply) external onlyOwner {
         MAX_SUPPLY = _supply;
     }
