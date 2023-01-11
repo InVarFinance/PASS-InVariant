@@ -5,6 +5,7 @@ interface IPass {
     error AlreadyClaimed();
     error EthersTransferErr();
     error InsufficientEthers();
+    error InvalidLeaf();
     error InvalidProof();
     error MintExceedsLimit();
     error MintNotStart();
@@ -95,11 +96,10 @@ interface IPass {
     /**
      * @notice User mints premium pass by burning their holding passes,
      *  one for earth, one for ocean
-     * @param _proof The multi proof of the token merkle tree
-     * @param _proofFlags The proof flags of the token merkle tree
+     * @param _proofs The proofs of the tokens
      * @param _tokens The tokens that user is holding
      */
-    function premiumMint(bytes32[] calldata _proof, bool[] calldata _proofFlags, uint256[] calldata _tokens) external;
+    function premiumMint(bytes32[][] calldata _proofs, uint256[] calldata _tokens) external;
 
     /**
      * @notice This function is for the future projects use

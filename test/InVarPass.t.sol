@@ -45,9 +45,9 @@ contract InVarPassTest is Test, IPassConstants {
         vm.assume(node < _freeMintLeave.length);
 
         // free mint proof
-        _freeMintLeave[0] = keccak256(bytes.concat(keccak256(abi.encode(alice))));
+        _freeMintLeave[node] = keccak256(bytes.concat(keccak256(abi.encode(alice))));
         bytes32 freeMintRoot = merkle.getRoot(_freeMintLeave);
-        bytes32[] memory freeMintProof = merkle.getProof(_freeMintLeave, 0);
+        bytes32[] memory freeMintProof = merkle.getProof(_freeMintLeave, node);
 
         vm.startPrank(owner);
         ipass.setSaleConfig(true, false, false, false);
@@ -288,47 +288,43 @@ contract InVarPassTest is Test, IPassConstants {
 
     // oz/merkle-tree hash pair func is not the same as murkey/Merkle
     // use dummy data to test instead
-    function testPremiumMint() public {
-        // token root
-        bytes32 root = 0x4ed6fa3d623b003df23ff953a1ddd60616ca26c43b06ad2ff06b6a139ee2fe2f;
-        
-        // multi proof & flags
-        bytes32[] memory multiProof = new bytes32[](2);
-        multiProof[0] = 0x6f5a07349193d4faac44fd1ad6e052fe3cb9dd746c454b73cba5ebc975a6e7bb;
-        multiProof[1] = 0x9fb575fc6758f041f5002e350be6a79058626fe3f9dabb9ea2d9ea355c509958;
-        bool[] memory flags = new bool[](3);
-        flags[0] = false;
-        flags[1] = true;
-        flags[2] = false;
+    function testPremiumMint(bytes32[] memory _tokenLeave) public {
+        vm.assume(_tokenLeave.length > 2);
+
+        // token proof
+        _tokenLeave[0] = keccak256(bytes.concat(keccak256(abi.encode(1, EARTH))));
+        _tokenLeave[1] = keccak256(bytes.concat(keccak256(abi.encode(2, OCEAN))));
+        bytes32 tokenRoot = merkle.getRoot(_tokenLeave);
+        bytes32[][] memory proofs = new bytes32[][](2);
+        proofs[0] = merkle.getProof(_tokenLeave, 0);
+        proofs[1] = merkle.getProof(_tokenLeave, 1);
 
         uint256[] memory tokens = new uint256[](2);
         tokens[0] = 1;
         tokens[1] = 2;
 
         vm.startPrank(owner);
-        // public sale & premium mint
         ipass.setSaleConfig(false, false, true, true);
-        ipass.setMerkleRoot(root, TOKEN);
+        ipass.setMerkleRoot(tokenRoot, TOKEN);
         deal(alice, 1 ether);
         changePrank(alice);
+        // public sale & premium mint
         ipass.publicMint{value: 0.2 ether}(2);
-        ipass.premiumMint(multiProof, flags, tokens);
+        ipass.premiumMint(proofs, tokens);
         assertEq(ipass.balanceOf(alice), 1);
         vm.stopPrank();
     }
 
-    function test_RevertPremiumMintWithNotOwner() public {
-        // token root
-        bytes32 root = 0x4ed6fa3d623b003df23ff953a1ddd60616ca26c43b06ad2ff06b6a139ee2fe2f;
+    function test_RevertPremiumMintWithInvalidProof(bytes32[] memory _tokenLeave) public {
+        vm.assume(_tokenLeave.length > 2);
 
-        // multi proof & flags
-        bytes32[] memory multiProof = new bytes32[](2);
-        multiProof[0] = 0x6f5a07349193d4faac44fd1ad6e052fe3cb9dd746c454b73cba5ebc975a6e7bb;
-        multiProof[1] = 0x9fb575fc6758f041f5002e350be6a79058626fe3f9dabb9ea2d9ea355c509958;
-        bool[] memory flags = new bool[](3);
-        flags[0] = false;
-        flags[1] = true;
-        flags[2] = false;
+        // token proof
+        _tokenLeave[0] = keccak256(bytes.concat(keccak256(abi.encode(1, EARTH))));
+        _tokenLeave[1] = keccak256(bytes.concat(keccak256(abi.encode(2, OCEAN))));
+        bytes32 tokenRoot = merkle.getRoot(_tokenLeave);
+        bytes32[][] memory proofs = new bytes32[][](2);
+        proofs[0] = merkle.getProof(_tokenLeave, 0);
+        proofs[1] = merkle.getProof(_tokenLeave, 0);
 
         uint256[] memory tokens = new uint256[](2);
         tokens[0] = 1;
@@ -336,42 +332,13 @@ contract InVarPassTest is Test, IPassConstants {
 
         vm.startPrank(owner);
         ipass.setSaleConfig(false, false, true, true);
-        ipass.setMerkleRoot(root, TOKEN);
-        deal(alice, 1 ether);
-        changePrank(alice);
-        ipass.publicMint{value: 0.2 ether}(2);
-        changePrank(bob);
-        vm.expectRevert(IPass.NotOwner.selector);
-        ipass.premiumMint(multiProof, flags, tokens);
-        vm.stopPrank();
-    }
-
-    function test_RevertPremiumMintWithInvalidProof() public {
-        // token root
-        bytes32 root = 0x4ed6fa3d623b003df23ff953a1ddd60616ca26c43b06ad2ff06b6a139ee2fe2f;
-
-        // multi proof & flags
-        bytes32[] memory multiProof = new bytes32[](2);
-        multiProof[0] = 0x6f5a07349193d4faac44fd1ad6e052fe3cb9dd746c454b73cba5ebc975a6e7bb;
-        multiProof[1] = hex"6515";
-        bool[] memory flags = new bool[](3);
-        flags[0] = false;
-        flags[1] = true;
-        flags[2] = false;
-
-        uint256[] memory tokens = new uint256[](2);
-        tokens[0] = 1;
-        tokens[1] = 2;
-
-        vm.startPrank(owner);
-        ipass.setSaleConfig(false, false, true, true);
-        ipass.setMerkleRoot(root, TOKEN);
+        ipass.setMerkleRoot(tokenRoot, TOKEN);
         deal(alice, 1 ether);
         changePrank(alice);
         ipass.publicMint{value: 0.2 ether}(2);
         changePrank(alice);
         vm.expectRevert(IPass.InvalidProof.selector);
-        ipass.premiumMint(multiProof, flags, tokens);
+        ipass.premiumMint(proofs, tokens);
         vm.stopPrank();
     }
 
@@ -392,5 +359,10 @@ contract InVarPassTest is Test, IPassConstants {
         vm.stopPrank();
         bool result = ipass.verifyToken(tokenProofs[0], 1, EARTH, alice);
         assertTrue(result);
+    }
+
+    function testGetLicenseURI() public {
+        string memory license = ipass.getLicenseURI();
+        emit log_named_string("License URI", license);
     }
 }

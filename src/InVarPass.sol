@@ -12,7 +12,14 @@ import {CantBeEvil, LicenseVersion} from "a16z-contracts/licenses/CantBeEvil.sol
 import {MerkleProof} from "openzeppelin-contracts/utils/cryptography/MerkleProof.sol";
 import {Counters} from "openzeppelin-contracts/utils/Counters.sol";
 
-contract InVarPass is ERC721Enumerable, IPass, IPassConstants, Ownable, ReentrancyGuard, CantBeEvil {
+contract InVarPass is
+    ERC721Enumerable,
+    IPass,
+    IPassConstants,
+    Ownable,
+    ReentrancyGuard,
+    CantBeEvil
+{
     using Counters for Counters.Counter;
 
     Counters.Counter private _tokenIds;
@@ -41,7 +48,13 @@ contract InVarPass is ERC721Enumerable, IPass, IPassConstants, Ownable, Reentran
         _baseuri = _uri;
     }
 
-    function supportsInterface(bytes4 interfaceId) public view virtual override(ERC721Enumerable, CantBeEvil) returns (bool) {
+    function supportsInterface(bytes4 interfaceId)
+        public
+        view
+        virtual
+        override(ERC721Enumerable, CantBeEvil)
+        returns (bool)
+    {
         return super.supportsInterface(interfaceId);
     }
 
@@ -88,7 +101,9 @@ contract InVarPass is ERC721Enumerable, IPass, IPassConstants, Ownable, Reentran
     }
 
     function withdraw() external onlyOwner nonReentrant {
-        (bool success, ) = payable(MULTISIG).call{value: address(this).balance}("");
+        (bool success, ) = payable(MULTISIG).call{value: address(this).balance}(
+            ""
+        );
         if (!success) revert EthersTransferErr();
     }
 
@@ -97,11 +112,15 @@ contract InVarPass is ERC721Enumerable, IPass, IPassConstants, Ownable, Reentran
      */
 
     function freeMint(bytes32[] calldata _proof) external {
-        if (trees.freemintMerkleRoot == 0 || !saleConfig.isFreeMint) revert MintNotStart();
+        if (trees.freemintMerkleRoot == 0 || !saleConfig.isFreeMint)
+            revert MintNotStart();
         // merkle proof
         // double-hashed value to meet oz/merkle-tree hashLeaf func
-        bytes32 leaf = keccak256(bytes.concat(keccak256(abi.encode(msg.sender))));
-        if (!MerkleProof.verifyCalldata(_proof, trees.freemintMerkleRoot, leaf)) revert InvalidProof();
+        bytes32 leaf = keccak256(
+            bytes.concat(keccak256(abi.encode(msg.sender)))
+        );
+        if (!MerkleProof.verifyCalldata(_proof, trees.freemintMerkleRoot, leaf))
+            revert InvalidProof();
         if (mintRecords[msg.sender].freemintClaimed) revert AlreadyClaimed();
         // free mint
         uint256 tokenId = _generateTokenId();
@@ -111,12 +130,21 @@ contract InVarPass is ERC721Enumerable, IPass, IPassConstants, Ownable, Reentran
         emit Mint(msg.sender, Stage.Free, tokenId);
     }
 
-    function whitelistMint(bytes32[] calldata _proof) external payable nonReentrant {
-        if (trees.whitelistMerkleRoot == 0 || !saleConfig.isWhitelistMint) revert MintNotStart();
+    function whitelistMint(bytes32[] calldata _proof)
+        external
+        payable
+        nonReentrant
+    {
+        if (trees.whitelistMerkleRoot == 0 || !saleConfig.isWhitelistMint)
+            revert MintNotStart();
         // merkle proof
         // double-hashed value to meet oz/merkle-tree hashLeaf func
-        bytes32 leaf = keccak256(bytes.concat(keccak256(abi.encode(msg.sender))));
-        if (!MerkleProof.verifyCalldata(_proof, trees.whitelistMerkleRoot, leaf)) revert InvalidProof();
+        bytes32 leaf = keccak256(
+            bytes.concat(keccak256(abi.encode(msg.sender)))
+        );
+        if (
+            !MerkleProof.verifyCalldata(_proof, trees.whitelistMerkleRoot, leaf)
+        ) revert InvalidProof();
         if (mintRecords[msg.sender].whitelistClaimed) revert AlreadyClaimed();
         // whitelist mint
         uint256 tokenId = _generateTokenId();
@@ -129,7 +157,8 @@ contract InVarPass is ERC721Enumerable, IPass, IPassConstants, Ownable, Reentran
 
     function publicMint(uint256 _quantity) external payable nonReentrant {
         if (!saleConfig.isPublicMint) revert MintNotStart();
-        if (PUBLIC_MINT_QTY < mintRecords[msg.sender].publicMinted + _quantity) revert MintExceedsLimit();
+        if (PUBLIC_MINT_QTY < mintRecords[msg.sender].publicMinted + _quantity)
+            revert MintExceedsLimit();
         mintRecords[msg.sender].publicMinted += uint8(_quantity);
 
         for (uint256 i = 0; i < _quantity; i++) {
@@ -141,26 +170,18 @@ contract InVarPass is ERC721Enumerable, IPass, IPassConstants, Ownable, Reentran
         _refundIfOver(PUBLICSALE_PRICE * _quantity);
     }
 
-    function premiumMint(bytes32[] calldata _proof, bool[] calldata _proofFlags, uint256[] calldata _tokens) external {
+    function premiumMint(
+        bytes32[][] calldata _proofs,
+        uint256[] calldata _tokens
+    ) external {
         if (!saleConfig.isPremiumMint) revert MintNotStart();
-        if (ownerOf(_tokens[0]) != msg.sender ||
-            ownerOf(_tokens[1]) != msg.sender) revert NotOwner();
+        if (
+            !(verifyToken(_proofs[0], _tokens[0], EARTH, msg.sender) &&
+                verifyToken(_proofs[1], _tokens[1], OCEAN, msg.sender))
+        ) revert InvalidProof();
 
-        bytes32[] memory leave = new bytes32[](_tokens.length);
-        leave[0] = keccak256(bytes.concat(keccak256(abi.encode(_tokens[0], EARTH))));
-        leave[1] = keccak256(bytes.concat(keccak256(abi.encode(_tokens[1], OCEAN))));
         _burn(_tokens[0]);
         _burn(_tokens[1]);
-
-        // leave: earth, ocean
-        if (
-            !MerkleProof.multiProofVerifyCalldata(
-                _proof,
-                _proofFlags,
-                trees.tokenMerkleRoot,
-                leave
-            )
-        ) revert InvalidProof();
 
         uint256 tokenId = _getPremiumTokenId();
         _safeMint(msg.sender, tokenId);
@@ -185,18 +206,20 @@ contract InVarPass is ERC721Enumerable, IPass, IPassConstants, Ownable, Reentran
         return tokenId;
     }
 
-    function _getPremiumTokenId() private view returns (uint256) {
-        return _premiumTokenIds + 1;
+    function _getPremiumTokenId() private returns (uint256) {
+        return ++_premiumTokenIds;
     }
 
     // for other services to verify the owner of token and the pass type
     function verifyToken(
         bytes32[] calldata _proof,
         uint256 _tokenId,
-        bytes calldata _type,
+        bytes memory _type,
         address _owner
     ) public view returns (bool) {
-        bytes32 leaf = keccak256(bytes.concat(keccak256(abi.encode(_tokenId, _type))));
+        bytes32 leaf = keccak256(
+            bytes.concat(keccak256(abi.encode(_tokenId, _type)))
+        );
         return (MerkleProof.verifyCalldata(
             _proof,
             trees.tokenMerkleRoot,
