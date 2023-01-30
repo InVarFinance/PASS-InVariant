@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.13;
+pragma solidity ^0.8.0;
 
 import "forge-std/Script.sol";
 import { InVarPass } from "../src/InVarPass.sol";
@@ -9,6 +9,6 @@ contract InVarPassScript is Script {
 
     function run() public {
         vm.broadcast();
-        new InVarPass("InVarPass", "IVP", 500, 30, "");
+        new InVarPass("InVarPass", "IVP", 500, "");
     }
 }

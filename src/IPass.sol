@@ -5,11 +5,12 @@ interface IPass {
     error AlreadyClaimed();
     error EthersTransferErr();
     error InsufficientEthers();
-    error InvalidLeaf();
     error InvalidProof();
+    error InvalidStage();
+    error LengthMismatch();
     error MintExceedsLimit();
     error MintNotStart();
-    error NotOwner();
+    error WrongPremiumTokenIds();
 
     enum Stage {
         Free,
@@ -18,14 +19,11 @@ interface IPass {
         Premium
     }
 
+    event UpdateSaleStage(Stage _stage);
+    event UpdateBaseUri(string _uri);
+    event UpdateMerkleRoot(bytes32 indexed _name, bytes32 _root);
+    event UpdatePremiumMint(bool _isPremiumMint);
     event Mint(address indexed _to, Stage indexed _stage, uint256 _tokenId);
-
-    struct SaleConfig {
-        bool isFreeMint;
-        bool isWhitelistMint;
-        bool isPublicMint;
-        bool isPremiumMint;
-    }
 
     struct Trees {
         bytes32 freemintMerkleRoot;
@@ -45,7 +43,7 @@ interface IPass {
     /**
      * @notice Owner sets the current sale stage
      */ 
-    function setSaleConfig(bool _isFreeMint, bool _isWhitelistMint, bool _isPublicMint, bool _isPremiumMint) external;
+    function setSaleStage(Stage _stage) external;
 
     /**
      * @notice Owner sets the merkle root for free mint, whitelist mint, tokens
@@ -55,18 +53,6 @@ interface IPass {
     function setMerkleRoot(bytes32 _root, bytes32 _name) external;
 
     /**
-     * @notice Owner sets the start premium token id
-     * @param _premium The start premium token start id
-     */
-    function setPremium(uint256 _premium) external;
-
-    /**
-     * @notice Owner sets the max supply for the pass
-     * @param _supply Total pass supply
-     */
-    function setMaxSupply(uint256 _supply) external;
-
-    /**
      * @notice Owner withdraw ethers to the project party's multisig vault
      */
     function withdraw() external;
@@ -74,6 +60,12 @@ interface IPass {
     /**
      * =================== Mint ===================
      */
+
+    /**
+     * @notice Get the lastest minted tokenId
+     * 
+     */
+    function currentTokenId() external view returns (uint256);
 
     /**
      * @notice User who is on free mint list can mint the pass

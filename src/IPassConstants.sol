@@ -15,5 +15,7 @@ contract IPassConstants{
     uint256 constant WHITELIST_PRICE = 0.05 ether;
     uint256 constant PUBLICSALE_PRICE = 0.1 ether;
     uint256 constant PUBLIC_MINT_QTY = 3;
+    uint256 constant MAX_SUPPLY = 500;
+    
     address constant MULTISIG = 0xAcB683ba69202c5ae6a3B9b9b191075295b1c41C;
 }

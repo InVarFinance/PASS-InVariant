@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.13;
+pragma solidity ^0.8.0;
 
 import {ERC721Enumerable, ERC721} from "openzeppelin-contracts/token/ERC721/extensions/ERC721Enumerable.sol";
-import {IPass} from "./IPass.sol";
-import {IPassConstants} from "./IPassConstants.sol";
+import {Counters} from "openzeppelin-contracts/utils/Counters.sol";
+import {MerkleProof} from "openzeppelin-contracts/utils/cryptography/MerkleProof.sol";
 import {Ownable} from "openzeppelin-contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "openzeppelin-contracts/security/ReentrancyGuard.sol";
 
-import {CantBeEvil, LicenseVersion} from "a16z-contracts/licenses/CantBeEvil.sol";
+import {IPass} from "./IPass.sol";
+import {IPassConstants} from "./IPassConstants.sol";
 
-import {MerkleProof} from "openzeppelin-contracts/utils/cryptography/MerkleProof.sol";
-import {Counters} from "openzeppelin-contracts/utils/Counters.sol";
+import {CantBeEvil, LicenseVersion} from "a16z-contracts/licenses/CantBeEvil.sol";
 
 contract InVarPass is
     ERC721Enumerable,
@@ -23,15 +23,13 @@ contract InVarPass is
     using Counters for Counters.Counter;
 
     Counters.Counter private _tokenIds;
-
-    SaleConfig public saleConfig;
-    Trees public trees;
-
-    // total supply
-    uint256 private MAX_SUPPLY;
     uint256 private _premiumTokenIds;
 
-    // mint records
+    Stage public currentStage;
+    bool public isPremiumMint;
+
+    Trees public trees;
+
     mapping(address => MintRecord) public mintRecords;
 
     string private _baseuri;
@@ -39,11 +37,11 @@ contract InVarPass is
     constructor(
         string memory _name,
         string memory _symbol,
-        uint256 _supply,
         uint256 _premium,
         string memory _uri
     ) ERC721(_name, _symbol) CantBeEvil(LicenseVersion.PERSONAL_NO_HATE) {
-        MAX_SUPPLY = _supply;
+        if (_premium < MAX_SUPPLY) revert WrongPremiumTokenIds();
+        currentStage = Stage.Free;
         _premiumTokenIds = _premium;
         _baseuri = _uri;
     }
@@ -62,18 +60,15 @@ contract InVarPass is
      *  =================== Owner Operation ===================
      */
 
-    function setSaleConfig(
-        bool _isFreeMint,
-        bool _isWhitelistMint,
-        bool _isPublicMint,
-        bool _isPremiumMint
-    ) external onlyOwner {
-        saleConfig = SaleConfig({
-            isFreeMint: _isFreeMint,
-            isWhitelistMint: _isWhitelistMint,
-            isPublicMint: _isPublicMint,
-            isPremiumMint: _isPremiumMint
-        });
+    function setSaleStage(Stage _stage) external onlyOwner {
+        if (uint8(_stage) > uint8(Stage.Public)) revert InvalidStage();
+        currentStage = _stage;
+        emit UpdateSaleStage(currentStage);
+    }
+
+    function setPremiumMint(bool _isPremium) external onlyOwner {
+        isPremiumMint = _isPremium;
+        emit UpdatePremiumMint(isPremiumMint);
     }
 
     function setMerkleRoot(bytes32 _root, bytes32 _name) external onlyOwner {
@@ -86,18 +81,12 @@ contract InVarPass is
         if (_name == TOKEN) {
             trees.tokenMerkleRoot = _root;
         }
+        emit UpdateMerkleRoot(_name, _root);
     }
 
     function setBaseUri(string memory _uri) external onlyOwner {
         _baseuri = _uri;
-    }
-
-    function setPremium(uint256 _premium) external onlyOwner {
-        _premiumTokenIds = _premium;
-    }
-
-    function setMaxSupply(uint256 _supply) external onlyOwner {
-        MAX_SUPPLY = _supply;
+        emit UpdateBaseUri(_uri);
     }
 
     function withdraw() external onlyOwner nonReentrant {
@@ -112,14 +101,14 @@ contract InVarPass is
      */
 
     function freeMint(bytes32[] calldata _proof) external {
-        if (trees.freemintMerkleRoot == 0 || !saleConfig.isFreeMint)
-            revert MintNotStart();
+        bytes32 root = trees.freemintMerkleRoot;
+        if (root == 0 || currentStage != Stage.Free) revert MintNotStart();
         // merkle proof
         // double-hashed value to meet oz/merkle-tree hashLeaf func
         bytes32 leaf = keccak256(
             bytes.concat(keccak256(abi.encode(msg.sender)))
         );
-        if (!MerkleProof.verifyCalldata(_proof, trees.freemintMerkleRoot, leaf))
+        if (!MerkleProof.verifyCalldata(_proof, root, leaf))
             revert InvalidProof();
         if (mintRecords[msg.sender].freemintClaimed) revert AlreadyClaimed();
         // free mint
@@ -135,16 +124,15 @@ contract InVarPass is
         payable
         nonReentrant
     {
-        if (trees.whitelistMerkleRoot == 0 || !saleConfig.isWhitelistMint)
-            revert MintNotStart();
+        bytes32 root = trees.whitelistMerkleRoot;
+        if (root == 0 || currentStage != Stage.Whitelist) revert MintNotStart();
         // merkle proof
         // double-hashed value to meet oz/merkle-tree hashLeaf func
         bytes32 leaf = keccak256(
             bytes.concat(keccak256(abi.encode(msg.sender)))
         );
-        if (
-            !MerkleProof.verifyCalldata(_proof, trees.whitelistMerkleRoot, leaf)
-        ) revert InvalidProof();
+        if (!MerkleProof.verifyCalldata(_proof, root, leaf))
+            revert InvalidProof();
         if (mintRecords[msg.sender].whitelistClaimed) revert AlreadyClaimed();
         // whitelist mint
         uint256 tokenId = _generateTokenId();
@@ -156,9 +144,10 @@ contract InVarPass is
     }
 
     function publicMint(uint256 _quantity) external payable nonReentrant {
-        if (!saleConfig.isPublicMint) revert MintNotStart();
+        if (currentStage != Stage.Public) revert MintNotStart();
         if (PUBLIC_MINT_QTY < mintRecords[msg.sender].publicMinted + _quantity)
             revert MintExceedsLimit();
+
         mintRecords[msg.sender].publicMinted += uint8(_quantity);
 
         for (uint256 i = 0; i < _quantity; i++) {
@@ -174,7 +163,9 @@ contract InVarPass is
         bytes32[][] calldata _proofs,
         uint256[] calldata _tokens
     ) external {
-        if (!saleConfig.isPremiumMint) revert MintNotStart();
+        if (!isPremiumMint) revert MintNotStart();
+        if (_proofs.length != _tokens.length) revert LengthMismatch();
+
         if (
             !(verifyToken(_proofs[0], _tokens[0], EARTH, msg.sender) &&
                 verifyToken(_proofs[1], _tokens[1], OCEAN, msg.sender))
@@ -192,16 +183,20 @@ contract InVarPass is
     function _refundIfOver(uint256 _price) private {
         if (msg.value < _price) revert InsufficientEthers();
         if (msg.value > _price) {
-            (bool success, ) = payable(msg.sender).call{
-                value: msg.value - _price
-            }("");
-            if (!success) revert EthersTransferErr();
+            unchecked {
+                (bool success, ) = payable(msg.sender).call{value: msg.value - _price}("");
+                if (!success) revert EthersTransferErr();
+            }
         }
+    }
+
+    function currentTokenId() public view returns (uint256) {
+        return _tokenIds.current();
     }
 
     function _generateTokenId() private returns (uint256) {
         _tokenIds.increment();
-        uint256 tokenId = _tokenIds.current();
+        uint256 tokenId = currentTokenId();
         if (tokenId >= MAX_SUPPLY) revert MintExceedsLimit();
         return tokenId;
     }
