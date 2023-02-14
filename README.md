@@ -14,7 +14,7 @@ The Premium Entry to HyFi Ecosystem. “PASS: InVariant” NFT is the premium ke
 - **What is the Early Adopter Stage?**
     - Early adopter is the one who own our first real-estate-backed NFT before February 2023. We make a promise in our early stage last year to give them free-cost ecosystem PASS.
 - **What about smart contract and audit?**
-    - The “PASS: InVariant” NFT is based on ERC721 smart contract with customized mechanism, the auditor is HashEx. The report also release on the NFT detail page.
+    - The “PASS: InVariant” NFT is based on ERC721 smart contract with customized mechanism, the auditor is HashEx. The [Audit report](https://github.com/HashEx/public_audits/blob/master/PASS%3A%20InVariant/PASS%3A%20InVariant.pdf) also release on the NFT detail page.
 - **Notice**
     - Remember to prepare enough ETH to the cost of minting and gas fee.
     - The Public Stage may occur small amount of NFT(s) available to mint, there is no guarantee of successful minting or any amount.
